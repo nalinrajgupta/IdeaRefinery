@@ -1,0 +1,6 @@
+interface:
+  display_name: "Idea Refinery Full"
+  short_description: "Orchestrate a full spec-refinement pipeline"
+  default_prompt: "Run the full Idea Refinery pipeline for this idea."
+policy:
+  allow_implicit_invocation: false
