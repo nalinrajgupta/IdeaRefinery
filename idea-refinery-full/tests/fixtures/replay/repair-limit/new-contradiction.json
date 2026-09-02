@@ -1,0 +1,8 @@
+{
+  "case_id": "repair-limit-new-contradiction",
+  "root_finding_id": "ROOT-original",
+  "prior_cycles": 1,
+  "risk_delta": "increased",
+  "new_high_severity_contradiction": true,
+  "expected": {"allowed": false, "reason": "new-high-severity-contradiction"}
+}

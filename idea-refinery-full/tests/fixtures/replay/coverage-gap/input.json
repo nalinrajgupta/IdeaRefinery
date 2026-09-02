@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "requirements": [
+    {"id": "FR-015", "areas": ["requirements", "tests"]},
+    {"id": "FR-019", "areas": ["reliability"]}
+  ],
+  "envelopes": [
+    {
+      "role": "product",
+      "coverage_attestations": [
+        {
+          "coverage_id": "COV-002",
+          "applicable": true,
+          "reviewed": true,
+          "evidence": ["spec.md#FR-015"],
+          "finding_ids": []
+        }
+      ]
+    },
+    {
+      "role": "architect",
+      "coverage_attestations": [
+        {
+          "coverage_id": "COV-004",
+          "applicable": true,
+          "reviewed": false,
+          "evidence": [],
+          "finding_ids": []
+        },
+        {
+          "coverage_id": "COV-009",
+          "applicable": true,
+          "reviewed": true,
+          "evidence": ["tasks.md#Phase-4"],
+          "finding_ids": ["A-2"]
+        }
+      ]
+    }
+  ]
+}

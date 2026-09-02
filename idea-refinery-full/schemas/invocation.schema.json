@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://idea-refinery.local/contracts/invocation.schema.json",
+  "title": "Idea Refinery Invocation Overrides",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "overrides"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "overrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["roles"],
+      "properties": {
+        "roles": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "ceo": {"$ref": "config.schema.json#/$defs/role"},
+            "product": {"$ref": "config.schema.json#/$defs/role"},
+            "architect": {"$ref": "config.schema.json#/$defs/role"},
+            "eval": {"$ref": "config.schema.json#/$defs/role"},
+            "baseline": {"$ref": "config.schema.json#/$defs/role"}
+          }
+        }
+      }
+    }
+  }
+}

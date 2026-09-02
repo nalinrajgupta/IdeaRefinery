@@ -1,0 +1,11 @@
+{
+  "COV-001": {"applicable": true, "evidence": [], "finding_ids": [], "reviewers": [], "state": "pending"},
+  "COV-002": {"applicable": true, "evidence": ["spec.md#FR-015"], "finding_ids": [], "reviewers": ["product"], "state": "reviewed-no-finding"},
+  "COV-003": {"applicable": true, "evidence": [], "finding_ids": [], "reviewers": [], "state": "pending"},
+  "COV-004": {"applicable": true, "evidence": [], "finding_ids": [], "reviewers": ["architect"], "state": "blind-spot"},
+  "COV-005": {"applicable": true, "evidence": [], "finding_ids": [], "reviewers": [], "state": "pending"},
+  "COV-006": {"applicable": true, "evidence": [], "finding_ids": [], "reviewers": [], "state": "pending"},
+  "COV-007": {"applicable": true, "evidence": [], "finding_ids": [], "reviewers": [], "state": "pending"},
+  "COV-008": {"applicable": true, "evidence": [], "finding_ids": [], "reviewers": [], "state": "pending"},
+  "COV-009": {"applicable": true, "evidence": ["tasks.md#Phase-4"], "finding_ids": ["A-2"], "reviewers": ["architect"], "state": "finding-raised"}
+}

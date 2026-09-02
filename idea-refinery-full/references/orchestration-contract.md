@@ -11,6 +11,8 @@ Idea
   -> Spec Kit clarify
   -> Spec Kit plan + tasks
   -> Spec Kit analyze
+  -> optional coverage follow-up
+  -> explicit bounded repair (0..2 cycles)
   -> resolve material gaps, or final handoff
 ```
 
@@ -26,6 +28,12 @@ Use Spec Kit's active feature directory. It should contain:
 - `refinery-state.md` — the persistent question registry, decision queue, review ledger, and stage log
 
 `refinery-state.md` is always persisted in full mode. Keep a separate final refinement report alongside the feature artifacts only when the user asks to persist it.
+
+The active session is the only model-execution surface. The deterministic sidecar receives a roster snapshot and validates outputs; it must not invoke provider APIs or model CLIs. Independent review briefs are immutable and isolated, and only the controller may update shared artifacts and ledgers.
+
+Coverage attestations are mandatory for every assigned item. Missing evidence on an applicable high-risk item is a blind spot, not a pass. At most one owner-selected follow-up is allowed per synthesis pass. A root finding, not a local wording ID, owns the two-cycle repair budget.
+
+The feature-local run store is authoritative for resumability: a result is reusable only when its input/config/schema/protected hashes and stage commit marker match. Repairs use sibling staging plus checkpoint rollback and cannot change constitution, scope, product priority, or risk tolerance under bounded consent.
 
 ## Finding format
 
@@ -57,3 +65,5 @@ Conclude with exactly one verdict:
 
 - `READY FOR IMPLEMENTATION` — an implementation agent can proceed without making a material product or architecture decision.
 - `BLOCKED ON DECISION` — name the decision ID, owner, options, recommendation, and impact.
+
+When a required role is explicitly waived after fallback exhaustion, use `READY FOR IMPLEMENTATION — DEGRADED` and include the missing perspective, affected coverage IDs, waiver owner, and rationale.

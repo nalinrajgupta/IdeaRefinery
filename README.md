@@ -16,6 +16,8 @@ Start a new Codex CLI session in the repository you want to refine, then run:
 $idea-refinery-full Build a collaborative idea-review workspace for product teams.
 ```
 
+For one-session tryout instructions and global installation, see [setup.md](setup.md).
+
 ## Full workflow
 
 ```text
@@ -32,6 +34,18 @@ Idea
 ```
 
 The workflow is intentionally sequential at decision points and independent at review points. Reviewers do not rewrite the spec directly; their findings flow into an audit ledger, then a synthesis pass resolves each finding.
+
+Full mode uses a hybrid runtime. The active Codex session discovers its available models and dispatches independent CEO, Product, and Architect workers. The bundled Python sidecar validates contracts, persists crash-safe run manifests, builds coverage matrices, tracks bounded repair checkpoints, and runs offline replay evals. It never calls provider APIs or model CLIs.
+
+The defaults are CEO `gpt-5.5`, Product `gpt-5.6-terra`, Architect `gpt-5.6-sol` (all high reasoning), Eval `gpt-5.6-luna` (medium), and Baseline `gpt-5.4` (medium), each with the ordered fallbacks described in the feature plan. Override them with a versioned `overrides.roles` block in the invocation or `.idea-refinery/config.yaml`; precedence is invocation → repository → bundled defaults.
+
+Deterministic checks can run without a live model session:
+
+```bash
+uv run --directory idea-refinery-full --project . pytest
+```
+
+Blocking CI uses contracts, property/integration tests, approved replay fixtures, and traceability. Live three-model versus single-model comparisons are explicitly promoted into replay fixtures only after review and calibration.
 
 ## Skills and responsibilities
 

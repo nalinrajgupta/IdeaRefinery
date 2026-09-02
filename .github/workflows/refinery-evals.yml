@@ -1,0 +1,27 @@
+name: Idea Refinery deterministic evals
+
+on:
+  push:
+    paths:
+      - "idea-refinery-full/**"
+      - "specs/001-refinery-quality-orchestration/**"
+      - ".github/workflows/refinery-evals.yml"
+  pull_request:
+    paths:
+      - "idea-refinery-full/**"
+      - "specs/001-refinery-quality-orchestration/**"
+      - ".github/workflows/refinery-evals.yml"
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: idea-refinery-full
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: latest
+      - run: uv sync --extra dev
+      - run: uv run pytest --cov=idea_refinery --cov-report=term-missing

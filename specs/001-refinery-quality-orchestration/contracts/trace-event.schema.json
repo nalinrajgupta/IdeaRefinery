@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://idea-refinery.local/contracts/trace-event.schema.json",
+  "title": "Idea Refinery Trace Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "sequence", "run_id", "occurred_at", "event_type", "stage", "actor", "input_refs", "output_refs", "data"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "event_id": {"type": "string", "pattern": "^EVT-[A-Za-z0-9._-]+$"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "event_type": {
+      "enum": [
+        "configuration-resolved", "stage-transition", "worker-dispatched", "worker-completed",
+        "worker-retried", "fallback-selected", "validation-rejected", "artifact-staged",
+        "artifact-promoted", "artifact-rolled-back", "followup-selected", "finding-dispositioned",
+        "repair-completed", "waiver-recorded", "stage-committed"
+      ]
+    },
+    "stage": {"type": "string", "minLength": 1},
+    "actor": {"type": "string", "minLength": 1},
+    "input_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "output_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "data": {"type": "object"}
+  }
+}
