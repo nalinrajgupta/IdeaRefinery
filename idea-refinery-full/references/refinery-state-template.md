@@ -8,8 +8,8 @@ This file is the controller state for one Idea Refinery Full feature. Update it 
 | --- | --- |
 | Feature | |
 | Active Spec Kit directory | |
-| Current stage | discovery \| spec-v1 \| review \| synthesis \| clarify \| plan-and-tasks \| analyze \| handoff |
-| Handoff verdict | draft \| ready-for-implementation \| blocked-on-decision |
+| Current stage | discovery \| spec-v1 \| review \| synthesis \| clarify \| plan-and-tasks \| analysis-authorization \| analyzing \| repairing \| handoff |
+| Handoff verdict | draft \| ready-for-implementation \| ready-for-implementation-degraded \| blocked-on-decision |
 
 ## Decision queue
 
@@ -34,6 +34,14 @@ Every material review finding must have one entry.
 | ID | Reviewer | Severity | Artifact / section | Evidence | Smallest proposed change | Human decision? | Resolution |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | R-001 | CEO \| Product \| Architect \| Spec Kit | blocker \| critical \| high \| medium \| low | | | | yes \| no | accepted \| rejected — rationale \| deferred — trigger \| decision-needed |
+
+## Run and repair ledger
+
+The state file summarizes the active run; detailed worker envelopes, immutable briefs, hashes, trace events, and stage markers live under the feature-local `runs/<run-id>/` directory.
+
+| Run ID | Resolved config hash | Active stage | Status | Repair authorization | Repair cycles | Waiver |
+| --- | --- | --- | --- | --- | --- | --- |
+| | | | | none \| bounded (max 2) | 0/2 | |
 
 ## Stage log
 

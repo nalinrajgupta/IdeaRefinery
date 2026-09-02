@@ -1,0 +1,8 @@
+{
+  "case_id": "repair-limit-alias-reset",
+  "root_finding_id": "ROOT-stable",
+  "known_aliases": ["ANALYSIS-1", "ANALYSIS-2"],
+  "incoming_alias": "ANALYSIS-999-rephrased",
+  "prior_cycles": 2,
+  "expected": {"allowed": false, "reason": "repair-cycle-limit-reached"}
+}

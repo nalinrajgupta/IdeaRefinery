@@ -9,13 +9,23 @@ Use this explicit-only workflow when the user wants the complete, artifact-backe
 
 The final deliverable is a Spec Kit feature directory containing `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md`, plus a concise refinement report. This workflow writes files and may create a feature branch. Do not start those mutations until the user approves the target repository and initialization plan.
 
+## Hybrid runtime and model profile
+
+Full mode is hybrid: this skill owns the active session’s model-roster discovery, delegation, approvals, and single-writer orchestration; the bundled Python package under `src/idea_refinery/` owns deterministic configuration, contracts, persistence, coverage bookkeeping, repair checkpoints, and replay evaluation. The package never calls provider APIs, external model CLIs, or credential stores.
+
+With no overrides, select the first available candidate in each ordered list: CEO `gpt-5.5` → `gpt-5.6-sol` → `gpt-5.6-terra` (high); Product `gpt-5.6-terra` → `gpt-5.6-sol` → `gpt-5.6-luna` (high); Architect `gpt-5.6-sol` → `gpt-5.5` → `gpt-5.6-terra` (high); Eval `gpt-5.6-luna` → `gpt-5.6-terra` → `gpt-5.6-sol` (medium); Baseline `gpt-5.4` (medium).
+
+Users may supply a versioned `overrides.roles` block. Precedence is invocation override, repository `.idea-refinery/config.yaml`, then bundled defaults. Capture and persist the complete resolved assignment before dispatch and revalidate it at dispatch. An explicit unavailable override fails unless it supplies its own fallbacks. If an effort is unsupported, select the highest supported effort not exceeding it and record the adjustment.
+
+The deterministic adapter can be exercised with `uv run --project idea-refinery-full idea-refinery <command>`. Its roster input is a controller-captured JSON snapshot, not a provider-discovery mechanism.
+
 ## Required setup
 
 1. Confirm the target repository and feature name. Inspect the repository and project instructions read-only first.
 2. Check for `.specify/` and `specify`.
 3. If the repository is not a Spec Kit project, explain that the full workflow needs `specify init --here --integration codex --integration-options="--skills"`. State the files/directories it will add and request explicit confirmation immediately before running it. Never add `--force` unless the user expressly approves merging Spec Kit files into a nonempty project.
 4. If a Spec Kit project already exists, identify its active feature directory before proceeding.
-5. Create `refinery-state.md` in the active feature directory from [the state template](references/refinery-state-template.md), or load and preserve the existing state file. This is the controller artifact for the rest of the workflow.
+5. Create `refinery-state.md` in the active feature directory from [the state template](references/refinery-state-template.md), or load and preserve the existing state file. This is the human controller summary; the feature-local `runs/<run-id>/` manifest and immutable objects are authoritative for resume.
 
 ## Orchestration contract
 
@@ -63,7 +73,13 @@ Synthesize the review artifacts into Spec v2. Resolve every material finding in 
 2. Load and run `$speckit-plan`, then `$speckit-tasks`, to create the implementation plan and tasks that `$speckit-analyze` requires.
 3. Load and run `$speckit-analyze`. Its report is read-only and must check coverage, ambiguity, duplication, terminology, constitution alignment, and task ordering across `spec.md`, `plan.md`, and `tasks.md`.
 
-If clarification or analysis reports blocker, critical, or high-severity gaps, return to Stage 3 with only those gaps. Regenerate only the artifacts invalidated by the change, then re-run the relevant Spec Kit checks. Stop when the remaining issue requires a human decision; do not loop on low-value wording.
+If clarification or analysis reports blocker, critical, or high-severity gaps, return to Stage 3 with only those gaps. Regenerate only artifacts invalidated by the dependency graph, then re-run the relevant checks. Before analysis, obtain one explicit authorization for at most two narrowly scoped repair cycles. Stage repairs from a checkpoint and promote atomically only when relevant checks pass and risk does not increase. Stop on recurring roots, new high-severity contradictions, or excluded decisions; do not loop on low-value wording.
+
+## Coverage, parallelism, and evals
+
+Derive stable coverage IDs before fan-out. Each reviewer receives only its immutable brief and assigned IDs, and must attest to every assigned item even when it found no issue. Run CEO, Product, and Architect concurrently up to three slots; otherwise queue the same frozen briefs. The controller sorts completed envelopes deterministically, canonicalizes duplicate root findings, and may issue one targeted follow-up for an uncovered high-risk item.
+
+Blocking quality gates are schema/semantic contracts, deterministic tests, approved replay fixtures, and requirement-to-task traceability. Live three-model versus single-model benchmarks and model-judge scores are non-blocking until calibrated. A failed required role blocks readiness unless the user records a waiver; then report `READY FOR IMPLEMENTATION — DEGRADED` with the missing perspective, affected coverage, owner, and rationale.
 
 ### Stage 5 — final handoff
 
