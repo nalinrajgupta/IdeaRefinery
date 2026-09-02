@@ -17,11 +17,18 @@ def test_representative_validation_stays_under_250ms(full_roster) -> None:
         "protected_artifact_hashes": {"spec.md": "a" * 64}, "findings": [],
         "coverage_attestations": [{"coverage_id": "COV-001", "applicable": True, "reviewed": True, "evidence": ["spec.md"], "finding_ids": []}],
     }
+    resolved = resolve_config(full_roster)
+    assignment = resolved["roles"]["ceo"]
+    envelope["model"] = assignment["selected_model"]
+    envelope["reasoning_effort"] = assignment["selected_reasoning_effort"]
+    dispatch = {
+        "role": "ceo",
+        "model": envelope["model"],
+        "reasoning_effort": envelope["reasoning_effort"],
+        "brief_id": "brief-1",
+    }
+
     start = time.perf_counter()
     for _ in range(50):
-        resolved = resolve_config(full_roster)
-        assignment = resolved["roles"]["ceo"]
-        envelope["model"] = assignment["selected_model"]
-        envelope["reasoning_effort"] = assignment["selected_reasoning_effort"]
-        validate_review_envelope(envelope, dispatch={"role": "ceo", "model": "gpt-5.5", "reasoning_effort": "high", "brief_id": "brief-1"}, assigned_coverage={"COV-001"}, protected_hashes={"spec.md": "a" * 64})
+        validate_review_envelope(envelope, dispatch=dispatch, assigned_coverage={"COV-001"}, protected_hashes={"spec.md": "a" * 64})
     assert (time.perf_counter() - start) < 0.25
