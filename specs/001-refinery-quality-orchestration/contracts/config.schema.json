@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://idea-refinery.local/contracts/config.schema.json",
+  "title": "Idea Refinery Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "roles"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ceo": {"$ref": "#/$defs/role"},
+        "product": {"$ref": "#/$defs/role"},
+        "architect": {"$ref": "#/$defs/role"},
+        "eval": {"$ref": "#/$defs/role"},
+        "baseline": {"$ref": "#/$defs/role"}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "concurrency_limit": {"type": "integer", "minimum": 1, "maximum": 3},
+        "role_retry_limit": {"type": "integer", "minimum": 0, "maximum": 1},
+        "coverage_followup_limit": {"type": "integer", "minimum": 0, "maximum": 1},
+        "repair_cycle_limit": {"type": "integer", "minimum": 0, "maximum": 2},
+        "worker_timeout_seconds": {"type": "integer", "minimum": 1}
+      }
+    }
+  },
+  "$defs": {
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "reasoning_effort"],
+      "properties": {
+        "model": {"type": "string", "minLength": 1},
+        "reasoning_effort": {
+          "enum": ["low", "medium", "high", "xhigh", "max", "ultra"]
+        },
+        "fallbacks": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    }
+  }
+}

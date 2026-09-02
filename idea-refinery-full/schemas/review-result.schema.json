@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://idea-refinery.local/contracts/review-result.schema.json",
+  "title": "Review Result Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "envelope_id", "run_id", "brief_id", "role", "model",
+    "reasoning_effort", "attempt", "status", "input_hashes", "protected_artifact_hashes",
+    "findings", "coverage_attestations"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "envelope_id": {"type": "string", "pattern": "^ENV-[A-Za-z0-9._-]+$"},
+    "run_id": {"type": "string", "minLength": 1},
+    "brief_id": {"type": "string", "minLength": 1},
+    "role": {"enum": ["ceo", "product", "architect"]},
+    "model": {"type": "string", "minLength": 1},
+    "reasoning_effort": {"enum": ["low", "medium", "high", "xhigh", "max", "ultra"]},
+    "attempt": {"type": "integer", "minimum": 1, "maximum": 2},
+    "status": {"enum": ["completed", "failed", "rejected-drift", "rejected-contract"]},
+    "started_at": {"type": "string", "format": "date-time"},
+    "completed_at": {"type": "string", "format": "date-time"},
+    "input_hashes": {"$ref": "#/$defs/hashMap"},
+    "protected_artifact_hashes": {"$ref": "#/$defs/hashMap"},
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "coverage_attestations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/attestation"}
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "message": {"type": "string", "minLength": 1},
+        "retryable": {"type": "boolean"}
+      }
+    }
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "hashMap": {
+      "type": "object",
+      "propertyNames": {"minLength": 1},
+      "additionalProperties": {"$ref": "#/$defs/hash"}
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local_id", "severity", "summary", "evidence", "coverage_ids", "affected_requirement_ids", "artifact_paths", "completion_criterion"],
+      "properties": {
+        "local_id": {"type": "string", "minLength": 1},
+        "severity": {"enum": ["blocker", "critical", "high", "medium", "low"]},
+        "summary": {"type": "string", "minLength": 1},
+        "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "coverage_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^COV-[0-9]+$"}},
+        "affected_requirement_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^FR-[0-9]+$"}},
+        "artifact_paths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "completion_criterion": {"type": "string", "minLength": 1},
+        "human_decision_required": {"type": "boolean", "default": false}
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coverage_id", "applicable", "reviewed", "evidence", "finding_ids"],
+      "properties": {
+        "coverage_id": {"type": "string", "pattern": "^COV-[0-9]+$"},
+        "applicable": {"type": "boolean"},
+        "reviewed": {"type": "boolean"},
+        "evidence": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "finding_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

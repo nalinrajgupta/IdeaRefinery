@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://idea-refinery.local/contracts/repair-packet.schema.json",
+  "title": "Bounded Repair Packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "packet_id", "run_id", "root_finding_id", "cycle", "severity",
+    "evidence", "affected_requirements", "affected_artifacts", "smallest_correction",
+    "completion_checks", "invalidated_artifacts", "authorization_class", "authorization_status",
+    "pre_repair_hashes", "status"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "packet_id": {"type": "string", "pattern": "^RP-[A-Za-z0-9._-]+$"},
+    "run_id": {"type": "string", "minLength": 1},
+    "root_finding_id": {"type": "string", "pattern": "^ROOT-[A-Za-z0-9._-]+$"},
+    "cycle": {"type": "integer", "minimum": 1, "maximum": 2},
+    "severity": {"enum": ["blocker", "critical", "high"]},
+    "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "affected_requirements": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^FR-[0-9]+$"}},
+    "affected_artifacts": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "smallest_correction": {"type": "string", "minLength": 1},
+    "completion_checks": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "invalidated_artifacts": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "authorization_class": {"enum": ["bounded", "separate-user-decision"]},
+    "authorization_status": {"enum": ["required", "authorized", "declined", "out-of-scope"]},
+    "pre_repair_hashes": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+    },
+    "staging_path": {"type": "string", "minLength": 1},
+    "status": {"enum": ["proposed", "staged", "validating", "promoted", "rolled-back", "stopped"]},
+    "risk_delta": {"enum": ["decreased", "unchanged", "increased", "not-measured"]},
+    "stop_reason": {"type": "string", "minLength": 1}
+  }
+}
