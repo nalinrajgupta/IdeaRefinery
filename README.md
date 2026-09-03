@@ -6,16 +6,18 @@ The repository provides two explicit-only workflows for Codex, GitHub Copilot, a
 
 | Skill | Use it when | Result |
 | --- | --- | --- |
-| `$idea-refinery-full <idea>` | You need to discover, review, clarify, plan, and task an idea | A ready or decision-blocked Spec Kit feature containing `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md` |
-| `$idea-refinery-implement` | The active Idea Refinery feature is ready and you want application changes | Reviewed code and tests, completed task state, `implementation-state.md`, convergence, and fresh verification evidence |
+| `idea-refinery-full` | You need to discover, review, clarify, plan, and task an idea | A ready or decision-blocked Spec Kit feature containing `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md` |
+| `idea-refinery-implement` | The active Idea Refinery feature is ready and you want application changes | Reviewed code and tests, completed task state, `implementation-state.md`, convergence, and fresh verification evidence |
 
 The split is an authority boundary. Refinement may create and revise design artifacts but never application code. Implementation may change the code and tests required by the approved handoff but never silently change product scope or architecture.
+
+Invocation syntax is host-specific: GitHub Copilot uses slash-prefixed skills, Codex uses dollar-prefixed skills, and Hermes uses its configured slash-skill form.
 
 ## End-to-end lifecycle
 
 ```text
 Rough idea
-  -> $idea-refinery-full
+  -> idea-refinery-full
        -> repository and Spec Kit setup
        -> Superpowers brainstorming
        -> Spec v1
@@ -26,7 +28,7 @@ Rough idea
        -> consistency analysis and bounded repair
        -> READY FOR IMPLEMENTATION
   -> separate user invocation
-  -> $idea-refinery-implement
+  -> idea-refinery-implement
        -> readiness and traceability preflight
        -> dependency-safe task waves
        -> isolated red-green-refactor workers
@@ -48,16 +50,18 @@ Use the architecture documents for the exact stage boundaries:
 
 For refinement:
 
-- Codex with skill support
+- Codex, GitHub Copilot CLI, or Hermes with skill support
 - Superpowers `brainstorming`
 - gstack `plan-ceo-review` and `plan-eng-review`
 - Spec Kit's `specify` CLI and repository-local `speckit-*` skills
 
-If the target repository is not a Spec Kit project, `$idea-refinery-full` explains and requests approval before running:
+If the target repository is not a Spec Kit project, `idea-refinery-full` explains the host-specific initialization and requests approval before running it. For GitHub Copilot:
 
 ```bash
-specify init --here --integration codex --integration-options="--skills"
+specify init --here --integration copilot
 ```
+
+Preserve any existing `.specify/` configuration; initialize only when that directory is absent.
 
 For implementation, the active feature must have:
 
@@ -67,6 +71,37 @@ For implementation, the active feature must have:
 - complete requirement-to-task traceability.
 
 The implementation skill prefers Superpowers subagent, TDD, debugging, review, and verification components. When one is unavailable, it records `composition: local-fallback` and applies the same evidence gates locally. Missing optional composition never relaxes readiness, isolation, review, or verification.
+
+## GitHub Copilot quick start
+
+This checkout already contains the repository-local skills:
+
+- `.agents/skills/idea-refinery-full`
+- `.agents/skills/idea-refinery-implement`
+
+Open GitHub Copilot CLI in the repository and refresh discovery if the skills were added after the session started:
+
+```text
+/skills reload
+```
+
+Start refinement with:
+
+```text
+/idea-refinery-full <idea>
+```
+
+A successful refinement creates `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md` under the active feature directory and finishes with `READY FOR IMPLEMENTATION`, a degraded readiness verdict, or a decision blocker.
+
+Implementation requires a separate authorization:
+
+```text
+/idea-refinery-implement
+```
+
+For personal installation across repositories, safe update/removal commands, project-local precedence, and Windows PowerShell or POSIX shell instructions, follow [Setup and tryout](setup.md). Cross-host capability and Spec Kit preservation rules remain in [Host compatibility and installation](docs/host-compatibility.md).
+
+The generated skill descriptions retain dollar-prefixed explicit-invocation wording for compatibility with other hosts. In GitHub Copilot CLI, use the slash-prefixed commands shown above.
 
 ## Try refinement in one session
 
@@ -210,7 +245,9 @@ Neither skill commits, pushes, opens pull requests, merges, deploys, creates iss
 
 ## Troubleshooting
 
-- **Skill name is not recognized**: verify both `readlink` commands, then start a new Codex session.
+- **Copilot skill name is not recognized**: run `/skills reload`, use `/skills` to inspect the active skill source, and restart the session if the catalog remains stale. A project-local `.agents/skills` copy takes precedence over a personal copy.
+- **Copilot shows dollar-prefixed wording**: the description is shared with other hosts; invoke `/idea-refinery-full` or `/idea-refinery-implement` in Copilot CLI.
+- **Codex skill name is not recognized**: verify both `readlink` commands, then start a new Codex session.
 - **Refinement cannot locate Spec Kit**: install `specify`; allow `$idea-refinery-full` to initialize the target only after reviewing its proposed changes.
 - **Implementation rejects the feature**: inspect `refinery-state.md` for the verdict, open decisions, unresolved high-severity findings, and missing traceability.
 - **Superpowers implementation components are absent**: the skill should record local fallback composition; it must not claim those components ran.
