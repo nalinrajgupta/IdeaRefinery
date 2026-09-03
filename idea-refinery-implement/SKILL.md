@@ -54,8 +54,8 @@ The controller is the only writer of `tasks.md`, `refinery-state.md`, and `imple
 5. Give every worker an immutable assignment envelope from the orchestration contract. Parallel edits require a host-enforced path boundary such as a scoped sandbox/freeze or an approved isolated worktree. If no boundary exists, have workers return proposed patches for controller application or execute sequentially. A worker may never update shared coordination artifacts and must stop when it discovers missing authority or an unexpected required path.
 6. After workers return, independently inspect changed paths and evidence. Do not trust completion claims without command output.
 7. Dispatch a different, read-only reviewer with the frozen before/after diff, applicable requirements, task IDs, and worker evidence. The reviewer does not edit files or talk to the user. A missing or invalid review envelope leaves the wave in `review-blocked` until a replacement independent review succeeds.
-8. Resolve every material finding. Apply objective in-scope corrections through a new TDD slice; reject incorrect feedback with evidence; stop for material decisions. Mark task checkboxes complete only after review disposition and wave verification pass.
-9. Run the relevant integrated verification command before starting the next dependent wave.
+8. Resolve every material finding. Apply objective in-scope corrections through a new TDD slice; reject incorrect feedback with evidence; stop for material decisions. Do not promote the slice yet.
+9. Run the relevant integrated verification command. Mark task checkboxes complete only after review disposition and integrated verification pass, then start the next dependent wave.
 
 When agent capacity is unavailable or only one safe slice exists, execute the same contract sequentially. Parallelism is an optimization, not a completeness requirement.
 
