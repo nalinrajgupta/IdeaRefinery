@@ -5,7 +5,7 @@
 From the repository root:
 
 ```bash
-python3 /Users/nalin-ai/.codex/skills/.system/skill-creator/scripts/quick_validate.py idea-refinery-implement
+python3 /absolute/path/to/skill-creator/scripts/quick_validate.py idea-refinery-implement
 ```
 
 Expected: the validator reports a valid skill with no scaffold placeholders.
