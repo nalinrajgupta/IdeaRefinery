@@ -75,8 +75,16 @@ def write_distribution(destination_root: Path, repository_root: Path = REPOSITOR
 def distributions_match(expected: Path, actual: Path) -> bool:
     """Compare generated files byte-for-byte without treating cache files as input."""
 
+if not expected.is_dir() or not actual.is_dir():
+        return False
+
     comparison = filecmp.dircmp(expected, actual)
-    if comparison.left_only or comparison.right_only or comparison.diff_files:
+    if comparison.left_only or comparison.right_only or comparison.common_funny:
+        return False
+    if any(
+        not filecmp.cmp(expected / name, actual / name, shallow=False)
+        for name in comparison.common_files
+    ):
         return False
     return all(
         distributions_match(expected / name, actual / name)
