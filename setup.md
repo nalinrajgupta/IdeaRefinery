@@ -190,7 +190,7 @@ Inspect the active feature pointer and state:
 
 ```bash
 sed -n '1,120p' .specify/feature.json
-sed -n '1,220p' specs/<feature-id>/refinery-state.md
+sed -n '1,220p' "specs/<feature-id>/refinery-state.md"
 ```
 
 Resolve open material decisions, missing artifacts, failed checklists, unresolved high-severity findings, or absent requirement-to-task mappings through the refinement workflow.
