@@ -75,7 +75,7 @@ Record material milestones without yielding while an actionable checklist item r
 ## Decisions and blockers
 
 | ID | Owner | Decision or blocker | Category | Options / evidence | Affected checklist items | Status |
-| --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- |
 
 ## Verification log
 
