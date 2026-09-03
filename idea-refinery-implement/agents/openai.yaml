@@ -1,0 +1,6 @@
+interface:
+  display_name: "Idea Refinery Implement"
+  short_description: "Execute refined plans with parallel TDD agents"
+  default_prompt: "Use $idea-refinery-implement to implement the active refined feature."
+policy:
+  allow_implicit_invocation: false

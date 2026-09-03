@@ -85,6 +85,8 @@ Blocking quality gates are schema/semantic contracts, deterministic tests, appro
 
 Deliver the required report and verify the final readiness gate in the orchestration contract. Do not implement application code in this workflow.
 
+When the verdict is ready, identify `$idea-refinery-implement` as the separate opt-in implementation workflow if it is available. Do not invoke it automatically; its application-code mutation authority requires a separate user request.
+
 ## Safety and scope
 
 - Initialization, spec generation, planning, and task generation create or modify repository files. Announce the exact operation before it happens and obtain any confirmation required by the component skill or the user’s environment.
