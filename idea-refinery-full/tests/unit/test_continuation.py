@@ -10,11 +10,11 @@ def test_drive_terminal_completes_all_internal_checklist_items_in_order() -> Non
     """Catches a drive loop that exits before routine completion work is done."""
     state = continuation.ContinuationState(
         checklist=(
-            continuation.CompletionItem("verify", "final-verification"),
-            continuation.CompletionItem("review", "review-correction"),
-            continuation.CompletionItem("state", "state-recording"),
-            continuation.CompletionItem("tasks", "task-promotion"),
-            continuation.CompletionItem("converge", "convergence"),
+            continuation.CompletionItem("verify", "final-verification", evidence="full suite passed"),
+            continuation.CompletionItem("review", "review-correction", evidence="R1 corrected"),
+            continuation.CompletionItem("state", "state-recording", evidence="state recorded"),
+            continuation.CompletionItem("tasks", "task-promotion", evidence="T001 promoted"),
+            continuation.CompletionItem("converge", "convergence", evidence="converge round 1 clean"),
         )
     )
 
@@ -40,7 +40,19 @@ def test_template_shaped_checklist_drives_all_routine_kinds_to_completion() -> N
         )
     )
 
-    result = continuation.drive_terminal(state)
+    result = continuation.drive_terminal(
+        state,
+        action_results={
+            "verify": "full suite passed",
+            "after": "after hook applied",
+            "converge": "converge round 1 clean",
+            "state": "state recorded",
+            "promote": "T001 promoted",
+            "correct": "R1 corrected",
+            "review": "review envelope accepted",
+            "task": "slice implemented",
+        },
+    )
 
     assert result.verdict == "IMPLEMENTATION COMPLETE"
     assert result.completed_item_ids == (
@@ -108,7 +120,7 @@ def test_granted_protected_path_resumes_and_completes_the_drive() -> None:
                 "protected-path-authorization",
                 category="specs/004/tasks.md",
             ),
-            continuation.CompletionItem("tasks", "task-promotion"),
+            continuation.CompletionItem("tasks", "task-promotion", evidence="T001 promoted"),
         )
     )
 
@@ -130,7 +142,7 @@ def test_missing_validator_is_an_external_blocker_with_one_remediation_request()
                 "validator-prerequisite",
                 category="PyYAML",
             ),
-            continuation.CompletionItem("verify", "final-verification"),
+            continuation.CompletionItem("verify", "final-verification", evidence="full suite passed"),
         )
     )
 
@@ -154,7 +166,7 @@ def test_equivalent_validation_evidence_completes_validator_prerequisite() -> No
                 "validator-prerequisite",
                 category="PyYAML",
             ),
-            continuation.CompletionItem("verify", "final-verification"),
+            continuation.CompletionItem("verify", "final-verification", evidence="full suite passed"),
         ),
         prerequisite_resolutions=(
             continuation.PrerequisiteResolution(
@@ -237,3 +249,54 @@ def test_unknown_blocker_category_is_rejected() -> None:
 
     with pytest.raises(ContractError, match="unknown blocker category"):
         continuation.drive_terminal(state)
+
+
+def test_unevidenced_pending_work_blocks_instead_of_claiming_completion() -> None:
+    """Catches a drive loop that completes gates without a recorded action result."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("tasks", "task-promotion", evidence="T001 promoted"),
+            continuation.CompletionItem("verify", "final-verification"),
+        )
+    )
+
+    result = continuation.drive_terminal(state)
+
+    assert result.verdict == "BLOCKED ON VERIFICATION"
+    assert result.completed_item_ids == ()
+    assert result.state.blockers[-1].category == "external-state"
+    assert "verify" in result.state.blockers[-1].detail
+
+
+def test_action_result_evidence_completes_a_previously_unevidenced_gate() -> None:
+    """Catches executed action results being ignored by the completion transition."""
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("verify", "final-verification"),)
+    )
+
+    result = continuation.drive_terminal(state, action_results={"verify": "full suite passed"})
+
+    assert result.verdict == "IMPLEMENTATION COMPLETE"
+    assert result.completed_item_ids == ("verify",)
+    assert result.state.checklist[0].evidence == "full suite passed"
+
+
+def test_completed_item_without_evidence_is_rejected() -> None:
+    """Catches a persisted checklist that claims completion without evidence."""
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("verify", "final-verification", completed=True),)
+    )
+
+    with pytest.raises(ContractError, match="require recorded acceptance evidence"):
+        continuation.validate_completion_checklist(state)
+
+
+@pytest.mark.parametrize("action_results", [{"verify": ""}, {"": "evidence"}, {"verify": 7}])
+def test_malformed_action_results_are_rejected(action_results: object) -> None:
+    """Catches malformed action results being treated as completion evidence."""
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("verify", "final-verification"),)
+    )
+
+    with pytest.raises(ContractError, match="action result requires"):
+        continuation.drive_terminal(state, action_results=action_results)

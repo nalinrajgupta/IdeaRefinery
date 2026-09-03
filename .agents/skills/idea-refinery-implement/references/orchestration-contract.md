@@ -20,7 +20,7 @@ Preflight runs before any mutable work: hooks, baselines that can write, snapsho
 
 Normalize paths repository-relative, resolve symlinks, and coalesce equivalent paths into one category. Persist a request token for each authorization category. The controller may ask at most once for a protected-path or prerequisite category during a run and later resumes; it must reuse the recorded grant/refusal rather than re-ask.
 
-The deterministic validation sidecar is provider- and credential-independent. It validates replayable checklist transitions and cannot make approvals, invoke providers, or run a scheduler. Its evidence informs the foreground controller; it does not replace controller-owned authorization or shared-artifact writes.
+The deterministic validation sidecar is provider- and credential-independent. It validates replayable checklist transitions and cannot make approvals, invoke providers, or run a scheduler. It completes an item only from recorded transition evidence—an executed action result, a scoped grant, or a validator resolution—and records `external-state` when a pending item has none. Its evidence informs the foreground controller; it does not replace controller-owned authorization or shared-artifact writes.
 
 ## Completion checklist and drive loop
 

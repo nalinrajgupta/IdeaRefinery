@@ -20,6 +20,7 @@ REPLAY_ROOT = Path(__file__).parents[1] / "fixtures" / "replay"
         "continuation-missing-validator",
         "continuation-equivalent-evidence",
         "continuation-true-blocker",
+        "continuation-unevidenced-work",
     ],
 )
 def test_continuation_replay_fixtures_match_terminal_drive_contract(fixture_name: str) -> None:

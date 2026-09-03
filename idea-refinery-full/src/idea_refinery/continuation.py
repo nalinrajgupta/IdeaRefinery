@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass, replace
 import json
 from pathlib import Path
@@ -41,6 +41,7 @@ class CompletionItem:
     kind: str
     completed: bool = False
     category: str | None = None
+    evidence: str | None = None
 
 
 @dataclass(frozen=True)
@@ -90,6 +91,24 @@ def _validate_contract(state: ContinuationState) -> None:
             "completion-completed-invalid",
             "completion completed must be a boolean",
             {"item_ids": invalid_completed},
+        )
+    invalid_evidence = [
+        item.item_id
+        for item in state.checklist
+        if item.evidence is not None and (not isinstance(item.evidence, str) or not item.evidence.strip())
+    ]
+    if invalid_evidence:
+        raise ContractError(
+            "completion-evidence-invalid",
+            "completion evidence must be a non-empty string when present",
+            {"item_ids": invalid_evidence},
+        )
+    unevidenced_completed = [item.item_id for item in state.checklist if item.completed and not item.evidence]
+    if unevidenced_completed:
+        raise ContractError(
+            "completion-evidence-missing",
+            "completed checklist items require recorded acceptance evidence",
+            {"item_ids": unevidenced_completed},
         )
     unknown_kinds = sorted({item.kind for item in state.checklist} - set(_INTERNAL_ORDER))
     if unknown_kinds:
@@ -179,6 +198,29 @@ def _resolution_tuple(
     return tuple(resolutions[category] for category in sorted(resolutions))
 
 
+def _validated_action_results(action_results: Mapping[str, str] | None) -> dict[str, str]:
+    """Reject malformed executed-action results before they authorize completion."""
+    if action_results is None:
+        return {}
+    if not isinstance(action_results, Mapping):
+        raise ContractError("action-results-invalid", "action results must be a mapping")
+    invalid = sorted(
+        str(item_id)
+        for item_id, evidence in action_results.items()
+        if not isinstance(item_id, str)
+        or not item_id.strip()
+        or not isinstance(evidence, str)
+        or not evidence.strip()
+    )
+    if invalid:
+        raise ContractError(
+            "action-result-invalid",
+            "action result requires an item id and non-empty evidence",
+            {"item_ids": invalid},
+        )
+    return dict(action_results)
+
+
 def _require_nonempty_string(value: Any, *, code: str, field: str, item_index: int) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ContractError(
@@ -236,7 +278,15 @@ def continuation_state_from_document(document: dict[str, Any]) -> ContinuationSt
                 field="category",
                 item_index=item_index,
             )
-        checklist_items.append(CompletionItem(item_id, kind, completed, category))
+        evidence = item.get("evidence")
+        if evidence is not None:
+            evidence = _require_nonempty_string(
+                evidence,
+                code="completion-evidence-invalid",
+                field="evidence",
+                item_index=item_index,
+            )
+        checklist_items.append(CompletionItem(item_id, kind, completed, category, evidence))
     checklist = tuple(checklist_items)
     raw_blockers = document.get("blockers", [])
     if not isinstance(raw_blockers, list):
@@ -339,10 +389,29 @@ def replay_continuation_fixture(path: Path) -> dict[str, Any]:
         continuation_state_from_document(document),
         granted_authorizations=document.get("granted_authorizations", []),
         available_validators=document.get("available_validators", []),
+        action_results=document.get("action_results"),
     )
     actual = continuation_result_document(result)
     expected = json.loads((path / "expected.json").read_text(encoding="utf-8"))
     return {"passed": actual == expected, "expected": expected, "actual": actual}
+
+
+def _transition_evidence(
+    item: CompletionItem,
+    results: Mapping[str, str],
+    resolutions: Mapping[str, PrerequisiteResolution],
+    granted: frozenset[str],
+) -> str | None:
+    """Return the recorded evidence that authorizes completing one gate."""
+    if item.kind == "protected-path-authorization" and f"protected-path:{item.category}" in granted:
+        return f"authorization granted: protected-path:{item.category}"
+    if item.kind == "validator-prerequisite":
+        resolution = resolutions.get(item.category or "")
+        if resolution is not None and resolution.outcome in _SATISFYING_PREREQUISITE_OUTCOMES:
+            return f"{resolution.outcome}: {resolution.evidence}"
+        return None
+    recorded = results.get(item.item_id) or item.evidence
+    return recorded if isinstance(recorded, str) and recorded.strip() else None
 
 
 def drive_terminal(
@@ -350,9 +419,11 @@ def drive_terminal(
     *,
     granted_authorizations: Collection[str] = (),
     available_validators: Collection[str] = (),
+    action_results: Mapping[str, str] | None = None,
 ) -> ContinuationResult:
-    """Complete every routine gate in deterministic workflow order."""
+    """Complete every evidenced routine gate in deterministic workflow order."""
     _validate_contract(state)
+    results = _validated_action_results(action_results)
     granted = frozenset(granted_authorizations)
     validators = frozenset(available_validators)
     if state.blockers:
@@ -444,12 +515,37 @@ def drive_terminal(
         (item for item in state.checklist if not item.completed),
         key=lambda item: (_INTERNAL_ORDER[item.kind], item.item_id),
     )
+    evidence_by_item: dict[str, str] = {}
+    unevidenced: list[str] = []
+    for item in pending:
+        evidence = _transition_evidence(item, results, resolution_by_category, granted)
+        if evidence:
+            evidence_by_item[item.item_id] = evidence
+        else:
+            unevidenced.append(item.item_id)
+    if unevidenced:
+        blocker = Blocker(
+            "external-state",
+            "no recorded transition evidence for: " + ", ".join(unevidenced),
+        )
+        verdict = _BLOCKER_VERDICTS[blocker.category]
+        return ContinuationResult(
+            replace(
+                state,
+                blockers=state.blockers + (blocker,),
+                prerequisite_resolutions=_resolution_tuple(resolution_by_category),
+                terminal_verdict=verdict,
+            ),
+            verdict,
+            (),
+        )
     completed_item_ids = tuple(item.item_id for item in pending)
-    completed = {item.item_id for item in pending}
     next_state = replace(
         state,
         checklist=tuple(
-            replace(item, completed=True) if item.item_id in completed else item
+            replace(item, completed=True, evidence=evidence_by_item[item.item_id])
+            if item.item_id in evidence_by_item
+            else item
             for item in state.checklist
         ),
         prerequisite_resolutions=_resolution_tuple(resolution_by_category),
