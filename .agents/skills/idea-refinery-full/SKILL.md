@@ -24,7 +24,7 @@ The deterministic adapter can be exercised with `uv run --project idea-refinery-
 
 1. Confirm the target repository and feature name. Inspect the repository and project instructions read-only first.
 2. Check for `.specify/` and `specify`.
-3. If the repository is not a Spec Kit project, explain that the full workflow needs `specify init --here --integration codex --integration-options="--skills"`. State the files/directories it will add and request explicit confirmation immediately before running it. Never add `--force` unless the user expressly approves merging Spec Kit files into a nonempty project.
+3. If the repository is not a Spec Kit project, resolve the current host and explain that the full workflow needs the matching command from `docs/host-compatibility.md`: Codex uses `specify init --here --integration codex --integration-options="--skills"`; GitHub Copilot uses `specify init --here --integration copilot`; Hermes preserves an existing integration or otherwise uses `specify init --here --integration generic --integration-options="--commands-dir .agents/commands/"`. State the files/directories it will add and request explicit confirmation immediately before running it. Never add `--force` unless the user expressly approves merging Spec Kit files into a nonempty project.
 4. If a Spec Kit project already exists, identify its active feature directory before proceeding.
 5. Create `refinery-state.md` in the active feature directory from [the state template](references/refinery-state-template.md), or load and preserve the existing state file. This is the human controller summary; the feature-local `runs/<run-id>/` manifest and immutable objects are authoritative for resume.
 
@@ -52,7 +52,7 @@ After every user answer, material review finding, resolution, or reopened decisi
 
 ### Stage 1 — Superpowers brainstorm
 
-Load and follow `$brainstorming` from `/Users/nalin-ai/.codex/skills/brainstorming/SKILL.md` for discovery. Classify the work, inspect context, ask one high-value question at a time, present 2–3 approaches with trade-offs and a recommendation, and obtain user approval for the selected design.
+Resolve `$brainstorming` using the current host's documented skill discovery mechanism (see the Host capability contract) and load its complete `SKILL.md` for discovery. Classify the work, inspect context, ask one high-value question at a time, present 2–3 approaches with trade-offs and a recommendation, and obtain user approval for the selected design.
 
 For this full workflow, stop Superpowers after the approved design and its self-review. Do **not** transition to its normal implementation-planning terminal step: the remaining stages below are the user-requested continuation. Create Spec Kit's initial `spec.md` through `$speckit-specify` after user approval.
 
