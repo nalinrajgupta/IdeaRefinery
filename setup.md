@@ -1,81 +1,330 @@
 # Setup and Tryout
 
-This guide covers Codex local/global registration. For GitHub Copilot and Hermes project-skill installation, invocation, update, removal, and Spec Kit guidance, see [host compatibility](docs/host-compatibility.md).
+This guide covers GitHub Copilot and Codex installation, invocation, update, removal, and troubleshooting. Hermes users should start with [host compatibility](docs/host-compatibility.md).
 
 ## Choose a setup mode
 
-| Mode | Best for | Changes global Codex skills? |
-| --- | --- | --- |
-| Direct-file session | Testing one checkout or branch | No |
-| Global symlink | Regular use across repositories and future sessions | Yes, by adding two reversible links |
+| Host | Mode | Best for | Installed location |
+| --- | --- | --- | --- |
+| GitHub Copilot | Repository-local skills | One project and checked-in team configuration | `.agents/skills/idea-refinery-*` |
+| GitHub Copilot | Personal copied skills | Reuse across repositories | `~/.copilot/skills/idea-refinery-*` |
+| Codex | Direct-file session | Testing one checkout or branch | No registration |
+| Codex | Global symlink | Reuse across repositories | `~/.codex/skills/idea-refinery-*` |
 
 ## Prerequisites
 
 You need:
 
-- a working `codex` command;
+- GitHub Copilot CLI or Codex;
 - an absolute path to this repository checkout;
 - the `specify` CLI for full refinement;
-- `uv` only when running the deterministic Python tests.
+- Python and `uv` only for deterministic repository validation.
 
-The target repository does not need to be initialized with Spec Kit in advance. `$idea-refinery-full` detects a missing `.specify/` directory, explains the files that initialization adds, and asks before running the command.
+Before initializing Spec Kit, inspect the target repository. If `.specify/` already exists, preserve it and do not reinitialize the repository; inspect `.specify/integration.json` when that metadata file is available. Only when `.specify/` is absent does an uninitialized GitHub Copilot target use:
 
-## Try `$idea-refinery-full` without global installation
+```text
+specify init --here --integration copilot
+```
 
-Start Codex in the target repository and tell it to load the checkout's skill file directly:
+Review the files this command will add and approve the mutation before running it. Never use `--force` unless you explicitly intend to merge Spec Kit files into a nonempty repository.
+
+## GitHub Copilot
+
+Copilot personal skills live under `~/.copilot/skills` (`$HOME\.copilot\skills` in PowerShell).
+
+### Repository-local skills
+
+This repository checks in both generated project-local skills:
+
+```text
+.agents/skills/idea-refinery-full
+.agents/skills/idea-refinery-implement
+```
+
+To install them into another project, copy both generated folders to that project's `.agents/skills` directory and commit them with the project if team-wide discovery is desired. Do not copy only `SKILL.md`; the full skill bundles its required runtime and references.
+
+After adding or updating skills, start Copilot CLI in the target repository and run:
+
+```text
+/skills reload
+```
+
+Use `/skills` to inspect the loaded skills and their locations. When project-local and personal copies both exist, the project-local copy is authoritative for that repository; update or remove the stale project copy if a personal update appears ineffective.
+
+Invoke refinement:
+
+```text
+/idea-refinery-full <idea>
+```
+
+After the workflow returns `READY FOR IMPLEMENTATION`, authorize implementation separately:
+
+```text
+/idea-refinery-implement
+```
+
+The generated descriptions retain dollar-prefixed explicit-invocation wording shared with other hosts. GitHub Copilot CLI commands use the slash-prefixed forms above.
+
+### Personal installation on Windows PowerShell
+
+Set the checkout path, then stage and verify both generated skills before replacing either personal target:
+
+```powershell
+$RefineryRepo = "C:\absolute\path\to\IdeaRefinery"
+$SourceRoot = Join-Path $RefineryRepo ".agents\skills"
+$TargetRoot = Join-Path $HOME ".copilot\skills"
+$Skills = @("idea-refinery-full", "idea-refinery-implement")
+$RunId = [Guid]::NewGuid().ToString("N")
+$StagingRoot = Join-Path $TargetRoot ".idea-refinery-staging-$RunId"
+$BackupRoot = Join-Path $TargetRoot ".idea-refinery-backup-$RunId"
+
+function Get-TreeManifest([string]$Root) {
+    Get-ChildItem -LiteralPath $Root -File -Recurse |
+        ForEach-Object {
+            [PSCustomObject]@{
+                Path = $_.FullName.Substring($Root.Length).TrimStart("\")
+                Hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+            }
+        } |
+        Sort-Object Path
+}
+
+foreach ($Skill in $Skills) {
+    $Source = Join-Path $SourceRoot $Skill
+    if (-not (Test-Path -LiteralPath (Join-Path $Source "SKILL.md"))) {
+        throw "Missing generated skill source: $Source"
+    }
+}
+
+$ReplacementComplete = $false
+$BackedUpSkills = @()
+$InstalledSkills = @()
+New-Item -ItemType Directory -Path $TargetRoot, $StagingRoot, $BackupRoot -Force -ErrorAction Stop | Out-Null
+
+try {
+    foreach ($Skill in $Skills) {
+        $Source = Join-Path $SourceRoot $Skill
+        $Staged = Join-Path $StagingRoot $Skill
+        Copy-Item -LiteralPath $Source -Destination $Staged -Recurse -ErrorAction Stop
+        if (Compare-Object (Get-TreeManifest $Source) (Get-TreeManifest $Staged) -Property Path, Hash) {
+            throw "Staging verification failed for $Skill"
+        }
+    }
+
+    try {
+        foreach ($Skill in $Skills) {
+            $Target = Join-Path $TargetRoot $Skill
+            if (Test-Path -LiteralPath $Target) {
+                Move-Item -LiteralPath $Target -Destination (Join-Path $BackupRoot $Skill) -ErrorAction Stop
+                $BackedUpSkills += $Skill
+            }
+        }
+
+        foreach ($Skill in $Skills) {
+            Move-Item -LiteralPath (Join-Path $StagingRoot $Skill) -Destination (Join-Path $TargetRoot $Skill) -ErrorAction Stop
+            $InstalledSkills += $Skill
+        }
+        $ReplacementComplete = $true
+    }
+    catch {
+        foreach ($Skill in $InstalledSkills) {
+            $Target = Join-Path $TargetRoot $Skill
+            if (Test-Path -LiteralPath $Target) {
+                Remove-Item -LiteralPath $Target -Recurse -Force -ErrorAction Stop
+            }
+        }
+        foreach ($Skill in $BackedUpSkills) {
+            $Target = Join-Path $TargetRoot $Skill
+            $Backup = Join-Path $BackupRoot $Skill
+            if (Test-Path -LiteralPath $Backup) {
+                Move-Item -LiteralPath $Backup -Destination $Target -ErrorAction Stop
+            }
+        }
+        throw
+    }
+}
+finally {
+    Remove-Item -LiteralPath $StagingRoot -Recurse -Force -ErrorAction SilentlyContinue
+    $BackupEmpty = -not (Get-ChildItem -LiteralPath $BackupRoot -Force -ErrorAction SilentlyContinue)
+    if ($ReplacementComplete -or $BackupEmpty) {
+        Remove-Item -LiteralPath $BackupRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    else {
+        Write-Error "Rollback failed; backup preserved at $BackupRoot"
+    }
+}
+```
+
+The same procedure installs and updates. Source preflight and staging occur before replacement, repeated runs produce exact copies, and a failed preflight leaves the current installation unchanged.
+
+Verify the installed trees:
+
+```powershell
+$RefineryRepo = "C:\absolute\path\to\IdeaRefinery"
+$SourceRoot = Join-Path $RefineryRepo ".agents\skills"
+$TargetRoot = Join-Path $HOME ".copilot\skills"
+$Skills = @("idea-refinery-full", "idea-refinery-implement")
+
+function Get-TreeManifest([string]$Root) {
+    Get-ChildItem -LiteralPath $Root -File -Recurse |
+        ForEach-Object {
+            [PSCustomObject]@{
+                Path = $_.FullName.Substring($Root.Length).TrimStart("\")
+                Hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+            }
+        } |
+        Sort-Object Path
+}
+
+foreach ($Skill in $Skills) {
+    $Source = Join-Path $SourceRoot $Skill
+    $Target = Join-Path $TargetRoot $Skill
+    if (Compare-Object (Get-TreeManifest $Source) (Get-TreeManifest $Target) -Property Path, Hash) {
+        throw "Installed skill differs from generated source: $Skill"
+    }
+}
+```
+
+Remove only the two personal skills; missing folders are treated as already removed:
+
+```powershell
+$TargetRoot = Join-Path $HOME ".copilot\skills"
+$Skills = @("idea-refinery-full", "idea-refinery-implement")
+
+foreach ($Skill in $Skills) {
+    $Target = Join-Path $TargetRoot $Skill
+    if (Test-Path -LiteralPath $Target) {
+        Remove-Item -LiteralPath $Target -Recurse -Force
+    }
+}
+```
+
+Run `/skills reload` after install, update, or removal. Restart Copilot CLI if the active session still shows the old catalog.
+
+### Personal installation on POSIX shells
+
+Set the checkout and target locations:
+
+```bash
+set -eu
+REFINERY_REPO="/absolute/path/to/IdeaRefinery"
+SOURCE_ROOT="$REFINERY_REPO/.agents/skills"
+TARGET_ROOT="$HOME/.copilot/skills"
+SKILLS="idea-refinery-full idea-refinery-implement"
+
+for skill in $SKILLS; do
+  test -f "$SOURCE_ROOT/$skill/SKILL.md" ||
+    { echo "Missing generated skill source: $SOURCE_ROOT/$skill" >&2; exit 1; }
+done
+
+mkdir -p "$TARGET_ROOT"
+STAGING_ROOT="$(mktemp -d "$TARGET_ROOT/.idea-refinery-staging.XXXXXX")"
+BACKUP_ROOT="$(mktemp -d "$TARGET_ROOT/.idea-refinery-backup.XXXXXX")"
+
+cleanup() {
+  rm -rf -- "$STAGING_ROOT"
+  if test ! -d "$BACKUP_ROOT" ||
+     test -z "$(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -print -quit)"; then
+    rm -rf -- "$BACKUP_ROOT"
+  fi
+}
+trap cleanup EXIT
+
+for skill in $SKILLS; do
+  cp -R "$SOURCE_ROOT/$skill" "$STAGING_ROOT/$skill"
+  diff -qr "$SOURCE_ROOT/$skill" "$STAGING_ROOT/$skill"
+done
+
+backed_up=""
+installed=""
+transaction_ok=true
+
+for skill in $SKILLS; do
+  if test -e "$TARGET_ROOT/$skill"; then
+    if mv "$TARGET_ROOT/$skill" "$BACKUP_ROOT/$skill"; then
+      backed_up="$backed_up $skill"
+    else
+      transaction_ok=false
+      break
+    fi
+  fi
+done
+
+if test "$transaction_ok" = true; then
+  for skill in $SKILLS; do
+    if mv "$STAGING_ROOT/$skill" "$TARGET_ROOT/$skill"; then
+      installed="$installed $skill"
+    else
+      transaction_ok=false
+      break
+    fi
+  done
+fi
+
+if test "$transaction_ok" != true; then
+  rollback_ok=true
+  for skill in $installed; do
+    rm -rf -- "$TARGET_ROOT/$skill" || rollback_ok=false
+  done
+  for skill in $backed_up; do
+    if test -e "$BACKUP_ROOT/$skill"; then
+      mv "$BACKUP_ROOT/$skill" "$TARGET_ROOT/$skill" || rollback_ok=false
+    fi
+  done
+  if test "$rollback_ok" != true; then
+    echo "Rollback failed; backup preserved at $BACKUP_ROOT" >&2
+    exit 1
+  fi
+  rm -rf -- "$BACKUP_ROOT"
+  exit 1
+fi
+
+rm -rf -- "$BACKUP_ROOT"
+```
+
+Verify exact copies:
+
+```bash
+REFINERY_REPO="/absolute/path/to/IdeaRefinery"
+SOURCE_ROOT="$REFINERY_REPO/.agents/skills"
+TARGET_ROOT="$HOME/.copilot/skills"
+SKILLS="idea-refinery-full idea-refinery-implement"
+
+for skill in $SKILLS; do
+  diff -qr "$SOURCE_ROOT/$skill" "$TARGET_ROOT/$skill"
+done
+```
+
+Remove only the two personal skills; `rm -rf --` is scoped to these resolved literal paths and succeeds when a target is missing:
+
+```bash
+TARGET_ROOT="$HOME/.copilot/skills"
+rm -rf -- \
+  "$TARGET_ROOT/idea-refinery-full" \
+  "$TARGET_ROOT/idea-refinery-implement"
+```
+
+Run `/skills reload` after install, update, or removal. Use `/skills` to inspect whether a project-local or personal copy is active.
+
+## Codex
+
+### Try without global installation
+
+Start Codex in the target repository and load the checkout's canonical skill directly:
 
 ```bash
 codex --cd /absolute/path/to/target-repository \
   "Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-full/SKILL.md. Refine this idea: <describe your idea>"
 ```
 
-Do not rely on the `$idea-refinery-full` name inside this session unless the skill is already registered globally. The explicit file instruction is the invocation.
-
-The workflow should:
-
-1. Inspect the target repository and project instructions.
-2. Confirm the feature name and Spec Kit initialization state.
-3. Ask before initialization or other required mutations.
-4. Produce `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md` under the active feature directory.
-5. Finish with a readiness verdict.
-
-## Try `$idea-refinery-implement` without global installation
-
-Use a target repository whose active feature came from Idea Refinery and is ready:
-
-```bash
-codex --cd /absolute/path/to/target-repository \
-  "Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-implement/SKILL.md. Implement the active ready Idea Refinery feature."
-```
-
-The feature must contain `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md`. A ready summary does not override an open material decision or unresolved high-severity finding.
-
-Expected implementation behavior:
-
-- validate checklists, hooks, readiness, and requirement-to-task coverage;
-- record baseline/red/green/refactor evidence;
-- parallelize only isolated, dependency-safe write sets, with at most three workers;
-- obtain independent read-only review before promoting tasks;
-- run up to two convergence implementation cycles;
-- create or resume `implementation-state.md`;
-- finish with `IMPLEMENTATION COMPLETE`, `BLOCKED ON DECISION`, or `BLOCKED ON VERIFICATION`.
-
-For a fixture-based test, use [the implementation quickstart](specs/002-parallel-tdd-implementation/quickstart.md).
-
-## Run both workflows in one session
-
-Start with the direct-file full-refinement command. Once the workflow returns a ready verdict, send a separate message:
+After a ready handoff, authorize implementation in a separate message:
 
 ```text
 Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-implement/SKILL.md.
 Implement the active ready Idea Refinery feature.
 ```
 
-The second message is required. Approval to refine an idea is not approval to change application code.
-
-## Install both skills globally
-
-Choose the checkout that should be the global source, then create two symlinks:
+### Install both skills globally
 
 ```bash
 REFINERY_REPO="/absolute/path/to/IdeaRefinery"
@@ -86,122 +335,49 @@ ln -sfn "$REFINERY_REPO/idea-refinery-implement" \
   ~/.codex/skills/idea-refinery-implement
 ```
 
-The source directories remain in the repository. The symlinks make them discoverable without creating duplicate copies.
-
-Verify the registrations:
-
-```bash
-readlink ~/.codex/skills/idea-refinery-full
-readlink ~/.codex/skills/idea-refinery-implement
-```
-
-Each command should print the matching folder under the checkout selected in `REFINERY_REPO`. If an existing link points to a different checkout, rerun the `ln -sfn` command with the intended absolute path.
-
-Start a new Codex session after installing or changing the links:
-
-```bash
-codex --cd /absolute/path/to/target-repository
-```
-
-Then invoke refinement:
-
-```text
-$idea-refinery-full <describe your idea>
-```
-
-After the handoff is ready, invoke implementation separately:
-
-```text
-$idea-refinery-implement
-```
-
-## Update the global installation
-
-Pull or edit the chosen checkout normally. Because the links point at that checkout, later sessions see the updated files automatically.
-
-To switch to another checkout, set `REFINERY_REPO` to its absolute path and rerun both `ln -sfn` commands. Restart active Codex sessions so their available-skill catalog is rebuilt.
-
-## Remove the global installation
-
-First verify that the targets are symlinks pointing to the expected skill folders:
-
-```bash
-ls -ld ~/.codex/skills/idea-refinery-full
-ls -ld ~/.codex/skills/idea-refinery-implement
-```
-
-Then remove only the two registration links:
-
-```bash
-rm ~/.codex/skills/idea-refinery-full
-rm ~/.codex/skills/idea-refinery-implement
-```
-
-This does not delete the repository or any target project's feature artifacts.
+Verify both links with `readlink`, then start a new Codex session. Updating the checkout updates the linked skills. Remove only the two links to uninstall.
 
 ## Validate the checkout
 
-Run the deterministic support-runtime tests:
-
-```bash
-uv run --project idea-refinery-full --extra dev pytest -q
+```powershell
+python tools\sync_host_skills.py --check
+uv run --project idea-refinery-full --extra dev python -m pytest tests\unit\test_host_skill_distribution.py
 ```
 
-Inspect the CLI surface:
-
-```bash
-uv run --project idea-refinery-full idea-refinery --help
-```
-
-Validate either skill with the Skill Creator validator installed by Codex:
-
-```bash
-python3 /absolute/path/to/skill-creator/scripts/quick_validate.py \
-  idea-refinery-full
-python3 /absolute/path/to/skill-creator/scripts/quick_validate.py \
-  idea-refinery-implement
-```
-
-The validator needs PyYAML. If the system Python lacks it, run the validator through a managed environment that includes this repository's dependencies.
+See [host compatibility](docs/host-compatibility.md) for the capability matrix, integration preservation rules, and generated-distribution ownership.
 
 ## Troubleshooting
 
-### The `$idea-refinery-*` command is missing
+### Copilot does not list the skills
 
-Run both `readlink` checks and confirm each target exists. Start a new Codex session; existing sessions do not necessarily reload the global skill catalog.
+Run `/skills reload`, inspect the catalog with `/skills`, and restart the session if needed. Confirm both `SKILL.md` files exist in the active project-local or personal location.
 
-### The wrong checkout is loaded
+### A personal update appears ineffective
 
-`readlink` shows the active source. Rerun `ln -sfn` for both skills with the intended `REFINERY_REPO` path, then restart Codex.
+A project-local `.agents/skills` copy is authoritative for that repository. Inspect the active source with `/skills`, then update or remove the stale project-local copy.
 
 ### Full refinement says Spec Kit is missing
 
-Install the `specify` CLI. If only the target repository is uninitialized, review and approve the initialization proposed by `$idea-refinery-full`:
+Install `specify`. If `.specify/` already exists, preserve it and inspect `.specify/integration.json` when available. Only when `.specify/` is absent should you review and approve:
 
-```bash
-specify init --here --integration codex --integration-options="--skills"
+```text
+specify init --here --integration copilot
 ```
 
-Never add `--force` unless you deliberately approve merging Spec Kit files into a nonempty project.
+Never use `--force` as a routine recovery step.
 
-### Implementation refuses to start
+### Implementation prerequisite detection fails
 
-Inspect the active feature pointer and state:
-
-```bash
-sed -n '1,120p' .specify/feature.json
-sed -n '1,220p' "specs/<feature-id>/refinery-state.md"
-```
-
-Resolve open material decisions, missing artifacts, failed checklists, unresolved high-severity findings, or absent requirement-to-task mappings through the refinement workflow.
+The implementation skill supports Spec Kit prerequisite scripts under `.specify/scripts/bash/` and `.specify/scripts/powershell/`. Repair or reinitialize the script distribution without overwriting an existing integration.
 
 ### Preferred Superpowers skills are unavailable
 
-This changes composition, not required behavior. `$idea-refinery-implement` records `composition: local-fallback` and applies its local scheduling, TDD, review, and verification contracts. It must never claim that an unavailable skill ran.
+This changes composition, not required behavior. The workflow records `composition: local-fallback` and applies the same evidence gates locally.
 
 ## Related documentation
 
 - [Project overview](README.md)
+- [Host compatibility](docs/host-compatibility.md)
 - [Repository structure](RepoStructure.md)
 - [Full refinement architecture](idea-refinery-full/ARCHITECTURE.md)
 - [Implementation architecture](idea-refinery-implement/ARCHITECTURE.md)

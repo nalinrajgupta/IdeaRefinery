@@ -5,18 +5,34 @@ Idea Refinery ships the same full refinement and implementation workflows for Co
 | Host | Discovery / install | Invocation | Spec Kit setup |
 | --- | --- | --- | --- |
 | Codex | Symlink canonical folders into `~/.codex/skills/` | `$idea-refinery-full`, then `$idea-refinery-implement` | `specify init --here --integration codex --integration-options="--skills"` |
-| GitHub Copilot | Commit `.agents/skills/idea-refinery-*` to the project, or copy the generated folders to a Copilot project-skill location | Invoke the matching skill by name in an agent session | `specify init --here --integration copilot` |
+| GitHub Copilot | Commit `.agents/skills/idea-refinery-*` to the project, or copy both generated folders to `~/.copilot/skills/` | `/idea-refinery-full`, then `/idea-refinery-implement` | `specify init --here --integration copilot` |
 | Hermes | Configure `.agents/skills/` as an external skill source, or copy each generated folder to `~/.hermes/skills/` | Invoke the matching slash skill | Preserve an existing integration; otherwise use `specify init --here --integration generic --integration-options="--commands-dir .agents/commands/"` |
 
-## Detect before initialization
+Complete failure-safe personal installation, update, removal, refresh, and precedence commands are in the [setup guide](../setup.md).
 
-For every host, inspect the target repository before running `specify init`:
+## PowerShell
+
+On Windows, inspect an existing integration without changing it:
+
+```powershell
+Test-Path -LiteralPath ".specify"
+if (Test-Path -LiteralPath ".specify\integration.json") {
+    Get-Content -LiteralPath ".specify\integration.json"
+}
+specify check
+```
+
+## POSIX shell
+
+On POSIX-compatible systems:
 
 ```bash
 test -d .specify && echo "Spec Kit already initialized"
 test -f .specify/integration.json && sed -n '1,160p' .specify/integration.json
 specify check
 ```
+
+## Detect before initialization
 
 If `.specify/` already exists, report its configured integration and preserve it. Do not overwrite or reinitialize it. If it is absent, explain the host-appropriate initialization command, the files it adds, and obtain explicit approval immediately before running it. Never use `--force` without the user's explicit approval.
 
@@ -34,11 +50,18 @@ Discovery of a skill does not guarantee that a host supplies every optional comp
 
 ## Update, remove, and validate
 
-Regenerate checked-in project skills after canonical changes:
+Regenerate checked-in project skills after canonical changes. PowerShell:
+
+```powershell
+python tools\sync_host_skills.py
+python tools\sync_host_skills.py --check
+```
+
+POSIX shell:
 
 ```bash
 python3 tools/sync_host_skills.py
 python3 tools/sync_host_skills.py --check
 ```
 
-For copied Copilot or Hermes installs, replace each installed `idea-refinery-*` folder with its newly generated counterpart. Validate each installed copy against the generated source, for example with `diff -r .agents/skills/idea-refinery-full <installed-skill-root>/idea-refinery-full` and the equivalent implementation-skill command; `tools/sync_host_skills.py --check` validates only the checked-in distribution. To remove an installation, delete only the copied or linked `idea-refinery-full` and `idea-refinery-implement` folders, never the repository or target feature artifacts.
+For copied Copilot or Hermes installs, replace each installed `idea-refinery-*` folder with its newly generated counterpart only after both sources validate. The [setup guide](../setup.md) provides failure-safe PowerShell and POSIX procedures. `tools/sync_host_skills.py --check` validates only the checked-in distribution. To remove an installation, delete only the copied or linked `idea-refinery-full` and `idea-refinery-implement` folders, never the repository or target feature artifacts.
