@@ -82,6 +82,15 @@ class ContinuationResult:
 
 
 def _validate_contract(state: ContinuationState) -> None:
+    invalid_completed = [
+        item.item_id for item in state.checklist if type(item.completed) is not bool
+    ]
+    if invalid_completed:
+        raise ContractError(
+            "completion-completed-invalid",
+            "completion completed must be a boolean",
+            {"item_ids": invalid_completed},
+        )
     unknown_kinds = sorted({item.kind for item in state.checklist} - set(_INTERNAL_ORDER))
     if unknown_kinds:
         raise ContractError("unknown-completion-kind", "unknown completion checklist kind", {"kinds": unknown_kinds})
