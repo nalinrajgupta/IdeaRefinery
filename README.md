@@ -27,7 +27,8 @@ Rough idea
        -> READY FOR IMPLEMENTATION
   -> separate user invocation
   -> $idea-refinery-implement
-       -> readiness and traceability preflight
+       -> readiness, traceability, protected-path, and validator preflight
+       -> explicit completion checklist and foreground terminal-drive loop
        -> dependency-safe task waves
        -> isolated red-green-refactor workers
        -> independent wave review
@@ -100,7 +101,7 @@ codex --cd /absolute/path/to/target-repository \
   "Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-implement/SKILL.md. Implement the active ready Idea Refinery feature."
 ```
 
-The skill validates the handoff again, records baseline and TDD evidence, schedules at most three safely isolated workers, obtains independent review, runs up to two convergence implementation cycles, and performs fresh final verification.
+The skill validates the handoff again, performs protected-path and validator preflight before mutable work, records one explicit completion checklist, schedules at most three safely isolated workers, obtains independent review, automatically corrects objective in-scope findings, runs up to two convergence implementation cycles, and performs fresh final verification. Progress messages do not end the invocation while authorized checklist work remains.
 
 To test the implementation skill itself against a fixture rather than a real application, follow [Spec 002's quickstart](specs/002-parallel-tdd-implementation/quickstart.md).
 
@@ -159,7 +160,9 @@ The default reviewer roles are CEO `gpt-5.5`, Product `gpt-5.6-terra`, Architect
 
 ### Implementation
 
-`$idea-refinery-implement` keeps the controller as the only writer of shared task and state artifacts. It derives conservative write sets, requires host-enforced isolation for parallel edits, caps waves at three workers, binds implementation to recorded baseline/red/green/refactor evidence, and requires a different read-only reviewer before task promotion. `$speckit-converge` detects omitted work after the planned tasks complete; gstack `$review` remains an optional pre-landing concern.
+`$idea-refinery-implement` keeps the controller as the only writer of shared task and state artifacts. It performs preflight for protected output paths and validator prerequisites before mutable work, asks at most once per required authority category, and drives one explicit completion checklist through task execution, review, objective correction, promotion, convergence, state recording, and final evidence. It derives conservative write sets, requires host-enforced isolation for parallel edits, caps waves at three workers, binds implementation to recorded baseline/red/green/refactor evidence, and requires a different read-only reviewer before task promotion. `$speckit-converge` detects omitted work after the planned tasks complete; gstack `$review` remains an optional pre-landing concern.
+
+The continuation validator in `idea-refinery-full` is deterministic and provider- and credential-independent. It validates checklist transitions and replay evidence only; it does not call model providers or act as a background monitor/scheduler.
 
 ## Develop and validate
 
@@ -175,9 +178,11 @@ Inspect deterministic CLI commands:
 uv run --project idea-refinery-full idea-refinery --help
 ```
 
-Validate the implementation skill structure with Codex's Skill Creator validator:
+After canonical skill edits, synchronize the generated Copilot/Hermes distribution, then validate the implementation skill structure with Codex's Skill Creator validator:
 
 ```bash
+python3 tools/sync_host_skills.py
+python3 tools/sync_host_skills.py --check
 python3 /absolute/path/to/skill-creator/scripts/quick_validate.py \
   idea-refinery-implement
 ```
@@ -189,7 +194,7 @@ The GitHub workflow currently runs deterministic tests for changes under `idea-r
 Neither skill commits, pushes, opens pull requests, merges, deploys, creates issues, or performs destructive cleanup unless the user separately requests a workflow with that authority.
 
 - `$idea-refinery-full` asks before Spec Kit initialization or artifact mutation where required.
-- `$idea-refinery-implement` stops on material decisions, unexplained verification failures, unsafe write overlap, or missing independent review.
+- `$idea-refinery-implement` continues through routine recovery (including objective review correction, scheduling repair, and replacement review) and blocks only on missing authority, material decisions, or external-state verification failures.
 - Review workers are read-only; shared state remains controller-owned.
 - Existing unrelated user changes are preserved.
 

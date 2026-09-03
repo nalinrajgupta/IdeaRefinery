@@ -11,9 +11,9 @@ Read [the orchestration contract](references/orchestration-contract.md) before d
 
 ## Authorization boundary
 
-Invoking this skill authorizes edits required by the active `tasks.md` and its approved convergence tasks. It does not authorize dependency upgrades outside the plan, destructive cleanup, commits, pushes, pull requests, merges, deployments, or edits that resolve a material product or architecture decision.
+Invoking this skill authorizes the controller to finish every approved, routine gate required by the active `tasks.md` and its approved convergence tasks: scheduling, implementation, objective in-scope review remediation, task promotion, state recording, convergence, hooks, and final verification. Do not ask the user again merely because the next routine gate is ready. It does not authorize dependency upgrades outside the plan, destructive cleanup, commits, pushes, pull requests, merges, deployments, or edits that resolve a material product or architecture decision.
 
-Preserve unrelated user changes. Never assign a worker an uncommitted path unless the change is part of the active feature and the controller has inspected it. Ask before creating worktrees or changing repository/branch structure.
+Preserve unrelated user changes. Never assign a worker an uncommitted path unless the change is part of the active feature and the controller has inspected it. Ask before creating worktrees or changing repository/branch structure. If a protected output path or validator prerequisite needs authority that this invocation does not grant, ask once per normalized path or prerequisite category during preflight, record the request, and do not repeat it on resume.
 
 ## Component routing
 
@@ -38,14 +38,28 @@ gstack `$review` is optional and belongs only after implementation verification 
 
 Before each stage, inspect the current host for skill discovery, component skills, delegation, command support, and enforceable isolated write boundaries. Use native capabilities only when they satisfy the stated gate. When a preferred component is unavailable, apply the equivalent contract and record `composition: local-fallback`; never claim it ran. If a host cannot enforce worker isolation, use controller-applied patches or sequential execution. Block rather than promote a result that lacks equivalent evidence.
 
-## Entry gate
+## Entry gate and preflight
 
 1. Confirm the target repository and resolve the active feature with `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks`.
 2. Require `.specify/`, `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md`. Load the constitution, research, data model, contracts, and quickstart when present. This skill does not implement generic Spec Kit features that lack an Idea Refinery handoff.
-3. Process enabled unconditional `before_implement` hooks exactly once per implementation run using `$speckit-implement` semantics: present optional hooks for user invocation and execute mandatory hooks before baseline tests or protected snapshots. Do not evaluate conditional hooks locally. Record output and changed paths for hooks that run; any later hook-driven mutation invalidates affected evidence.
-4. Report all feature checklists. If any item is unchecked, stop and obtain the same explicit proceed decision required by `$speckit-implement`.
-5. Require the refinery handoff verdict to be `ready-for-implementation` or `ready-for-implementation-degraded`. Independently scan the decision and question registries and stop when any material decision is open, `decision-needed`, or reopened, even if the summary verdict says ready. For a degraded handoff, surface the waiver and missing coverage before proceeding. Stop on `blocked-on-decision`, unresolved blocker/critical/high findings, or an absent/unrecognized readiness record.
-6. Capture the initial git status, artifact hashes, relevant baseline test result, available agent capacity, and resolved component routing in `implementation-state.md`.
+3. Build or resume one explicit completion checklist in `implementation-state.md` before any mutable application work. It must cover preflight authorization and validator resolution, tasks, reviews, objective corrections, task promotion, state recording, convergence, hooks, and final evidence. Give each item an owner, acceptance command or evidence target, status, and blocker category when blocked.
+4. Identify every protected output path that a planned command, hook, generator, formatter, test, or validator can mutate. Identify every validator prerequisite and whether the exact validator, equivalent evidence, or neither is available. Record the path/prerequisite category, required authority, remediation, and evidence. Do this before hooks, baselines, snapshots, leases, worker dispatch, or any other mutable work.
+5. If new authority is needed, issue at most one precise request for each normalized protected-path category or validator-prerequisite category. A request states the target/category, why it is needed, the smallest authority, and the affected checklist item. Persist the request token so a resume never re-asks. A refused or unavailable authority is a `missing-authority` blocker; it is not an ordinary pause.
+6. Process enabled unconditional `before_implement` hooks exactly once per implementation run using `$speckit-implement` semantics: present optional hooks for user invocation and execute mandatory hooks only after their protected paths and prerequisites have passed preflight. Do not evaluate conditional hooks locally. Record output and changed paths for hooks that run; any later hook-driven mutation invalidates affected evidence.
+7. Report all feature checklists. If any item is unchecked, obtain the same explicit proceed decision required by `$speckit-implement`; record it as a scoped authorization in the completion checklist rather than repeatedly pausing at later routine gates.
+8. Require the refinery handoff verdict to be `ready-for-implementation` or `ready-for-implementation-degraded`. Independently scan the decision and question registries and stop when any material decision is open, `decision-needed`, or reopened, even if the summary verdict says ready. For a degraded handoff, surface the waiver and missing coverage before proceeding. Stop on `blocked-on-decision`, unresolved blocker/critical/high findings, or an absent/unrecognized readiness record.
+9. Capture the initial git status, artifact hashes, relevant baseline test result, available agent capacity, resolved component routing, and completed preflight evidence in `implementation-state.md`.
+
+## Terminal-verdict drive loop
+
+After preflight, repeatedly advance the earliest incomplete checklist item until every item is complete or a genuine blocker is recorded. The controller owns this loop; it is not a background monitor or scheduler and it never waits for a new user message while actionable authorized work remains.
+
+1. Order checklist items deterministically: preflight authorization, validator prerequisites, review correction, task promotion, state recording, convergence, and final verification. Tasks and review evidence feed those gates; a correction always precedes promotion.
+2. For every incomplete routine item, take the smallest authorized action, update its evidence and status, invalidate dependent evidence when required, and continue to the next actionable item in the same invocation.
+3. Treat an objective, in-scope review finding as a new correction slice. Implement, review, and verify that correction without asking the user; then resume promotion. Reject incorrect review feedback with recorded evidence. Escalate only a finding that requires a material product or architecture decision.
+4. Send progress updates for material milestones, but do not yield control or end the turn because a routine task, remediation, promotion, convergence, state write, or verification step remains actionable. A progress update must name completed and next checklist items.
+5. A blocked outcome is valid only for `missing-authority`, `material-decision`, or `external-state`. Classify a failed exact validator as `external-state` only after checking for equivalent evidence; otherwise record that equivalent validation and continue. Scheduling conflicts, stale evidence, missing review envelopes, path drift, and unexplained failures are recovery work, not terminal pauses: isolate, repair, redispatch, or debug them within the loop.
+6. Emit a terminal verdict only after the loop has either completed every checklist item or explicitly attached one of those blocker categories to every non-completable item. Do not return an interim result with actionable internal work.
 
 ## Plan execution
 
@@ -58,14 +72,14 @@ The controller is the only writer of `tasks.md`, `refinery-state.md`, and `imple
 5. Give every worker an immutable assignment envelope from the orchestration contract. Parallel edits require a host-enforced path boundary such as a scoped sandbox/freeze or an approved isolated worktree. If no boundary exists, have workers return proposed patches for controller application or execute sequentially. A worker may never update shared coordination artifacts and must stop when it discovers missing authority or an unexpected required path.
 6. After workers return, independently inspect changed paths and evidence. Do not trust completion claims without command output.
 7. Dispatch a different, read-only reviewer with the frozen before/after diff, applicable requirements, task IDs, and worker evidence. The reviewer does not edit files or talk to the user. A missing or invalid review envelope leaves the wave in `review-blocked` until a replacement independent review succeeds.
-8. Resolve every material finding. Apply objective in-scope corrections through a new TDD slice; reject incorrect feedback with evidence; stop for material decisions. Do not promote the slice yet.
-9. Run the relevant integrated verification command. Mark task checkboxes complete only after review disposition and integrated verification pass, then start the next dependent wave.
+8. Resolve every material finding through the terminal-verdict drive loop. Apply objective in-scope corrections through a new TDD slice without a new user prompt; reject incorrect feedback with evidence; stop only for a material decision. Do not promote the slice yet.
+9. Run the relevant integrated verification command. Mark task checkboxes complete only after review disposition and integrated verification pass, record task promotion in the completion checklist, then continue the drive loop into the next dependent wave.
 
 When agent capacity is unavailable or only one safe slice exists, execute the same contract sequentially. Parallelism is an optimization, not a completeness requirement.
 
 ## Convergence and completion
 
-After the initial task list is complete, invoke `$speckit-converge` under the controller identity. Validate that its only write is the expected append-only `tasks.md` patch, record the before/after hashes, and reject any other mutation. If it appends tasks, execute them through the same scheduler, TDD, and review gates. Permit at most two convergence implementation cycles. Stop when the same root gap recurs, a new high-severity contradiction appears, or remediation requires a material decision.
+After the initial task list is complete, the drive loop invokes `$speckit-converge` under the controller identity. Validate that its only write is the expected append-only `tasks.md` patch, record the before/after hashes, and reject any other mutation. If it appends tasks, execute them through the same scheduler, TDD, review, and correction gates without asking the user again. Permit at most two convergence implementation cycles. Stop only when the same root gap needs a material decision, a new high-severity contradiction is unresolved, or an external-state failure prevents verification.
 
 Before completion:
 
@@ -75,7 +89,7 @@ Before completion:
 4. Confirm no assignment wrote outside its declared set and no unrelated user change was incorporated.
 5. If available, use `$verification-before-completion`; otherwise apply its evidence-before-claims rule locally.
 
-Return exactly one verdict:
+Return exactly one verdict. `BLOCKED ON DECISION` is only for missing authority or a material decision; `BLOCKED ON VERIFICATION` is only for an external-state failure after available equivalent evidence has been evaluated:
 
 - `IMPLEMENTATION COMPLETE` when all gates pass.
 - `BLOCKED ON DECISION` with the decision, owner, options, recommendation, and affected tasks.

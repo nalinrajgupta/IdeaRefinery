@@ -1,0 +1,8 @@
+{
+  "checklist": [
+    {"item_id": "state", "kind": "state-recording"},
+    {"item_id": "converge", "kind": "convergence"},
+    {"item_id": "verify", "kind": "final-verification"},
+    {"item_id": "tasks", "kind": "task-promotion"}
+  ]
+}

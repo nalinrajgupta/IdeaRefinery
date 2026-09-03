@@ -52,13 +52,17 @@ The feature must contain `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.m
 
 Expected implementation behavior:
 
+- run protected-output and validator-prerequisite preflight before any mutable work, requesting authority at most once per normalized category;
+- maintain and foreground-drive one completion checklist through tasks, reviews, corrections, promotion, state, convergence, hooks, and final evidence;
 - validate checklists, hooks, readiness, and requirement-to-task coverage;
 - record baseline/red/green/refactor evidence;
 - parallelize only isolated, dependency-safe write sets, with at most three workers;
-- obtain independent read-only review before promoting tasks;
+- obtain independent read-only review before promoting tasks and automatically correct objective in-scope findings;
 - run up to two convergence implementation cycles;
 - create or resume `implementation-state.md`;
 - finish with `IMPLEMENTATION COMPLETE`, `BLOCKED ON DECISION`, or `BLOCKED ON VERIFICATION`.
+
+Milestone updates report what completed and what comes next, but the controller does not yield while an authorized routine checklist item remains. A blocked result is reserved for missing authority, a material product/architecture decision, or an external-state verification failure after equivalent evidence has been considered.
 
 For a fixture-based test, use [the implementation quickstart](specs/002-parallel-tdd-implementation/quickstart.md).
 
@@ -141,6 +145,13 @@ This does not delete the repository or any target project's feature artifacts.
 
 ## Validate the checkout
 
+Regenerate portable Copilot/Hermes skill copies after changing canonical skill instructions, then confirm they match:
+
+```bash
+python3 tools/sync_host_skills.py
+python3 tools/sync_host_skills.py --check
+```
+
 Run the deterministic support-runtime tests:
 
 ```bash
@@ -194,6 +205,10 @@ sed -n '1,220p' "specs/<feature-id>/refinery-state.md"
 ```
 
 Resolve open material decisions, missing artifacts, failed checklists, unresolved high-severity findings, or absent requirement-to-task mappings through the refinement workflow.
+
+### Implementation requests authority or reports an unavailable validator
+
+The request should name one normalized protected output path or validator prerequisite category, the smallest authority needed, and the affected completion-checklist item. Granting it lets the same invocation continue through routine gates; the controller records the token and must not repeat that category on resume. If the exact validator is unavailable, it records equivalent evidence when available; only the absence of equivalent evidence is an external-state verification blocker.
 
 ### Preferred Superpowers skills are unavailable
 

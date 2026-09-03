@@ -32,6 +32,14 @@ If `.specify/` already exists, report its configured integration and preserve it
 
 Discovery of a skill does not guarantee that a host supplies every optional component. Each workflow inspects available skills, delegation, command support, and isolated write boundaries before its stages. A missing preferred component uses the documented equivalent local contract and records `composition: local-fallback`; it is never claimed as executed. When isolation is unavailable, implementation uses controller-applied patches or sequential execution. If equivalent evidence cannot be produced, the workflow blocks or returns a degraded verdict.
 
+## Implementation continuity across hosts
+
+Before any mutable implementation work, every host performs the same preflight: it identifies protected output paths and validator prerequisites, records exact-validator availability or equivalent evidence, and asks at most once for each normalized path/prerequisite authority category. The implementation controller then foreground-drives one completion checklist through tasks, reviews, objective in-scope review corrections, promotion, controller-state recording, convergence, hooks, and final verification. Progress updates do not end the invocation while an authorized routine item remains.
+
+Only `missing-authority`, `material-decision`, and `external-state` can produce a blocked implementation verdict. Routine recovery—such as a write-set conflict, stale evidence, an invalid reviewer envelope, or an objective review correction—continues in the controller loop. The deterministic continuation validator is provider- and credential-independent; it validates replayable workflow state and does not invoke model providers, require their credentials, or run a background scheduler.
+
+The controller is the sole writer of `tasks.md`, `refinery-state.md`, and `implementation-state.md` on every host. Generated `.agents/skills/idea-refinery-*` folders are distributions, not alternate sources: edit canonical `idea-refinery-*` folders and run the synchronization command below.
+
 ## Update, remove, and validate
 
 Regenerate checked-in project skills after canonical changes:

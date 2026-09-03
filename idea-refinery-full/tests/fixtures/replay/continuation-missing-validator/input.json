@@ -1,0 +1,10 @@
+{
+  "checklist": [
+    {
+      "category": "PyYAML",
+      "item_id": "validator",
+      "kind": "validator-prerequisite"
+    },
+    {"item_id": "verify", "kind": "final-verification"}
+  ]
+}
