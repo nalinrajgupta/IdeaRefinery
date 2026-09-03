@@ -1,122 +1,216 @@
 # Idea Refinery
 
-Idea Refinery turns a rough product or engineering idea into a handoff that other coding agents can implement without making material product or architecture decisions.
+Idea Refinery turns a rough product or engineering idea into an implementation-ready contract, then executes that contract through a separately authorized, test-driven workflow.
 
-It provides one explicit-only Codex skill:
+The repository provides two explicit-only Codex skills:
 
-| Command | Use it when | Output |
+| Skill | Use it when | Result |
 | --- | --- | --- |
-| `$idea-refinery-full <idea>` | You want the complete, artifact-backed pipeline with reviews, clarification, a technical plan, and an execution task list. | A Spec Kit feature directory containing `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md`. |
+| `$idea-refinery-full <idea>` | You need to discover, review, clarify, plan, and task an idea | A ready or decision-blocked Spec Kit feature containing `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md` |
+| `$idea-refinery-implement` | The active Idea Refinery feature is ready and you want application changes | Reviewed code and tests, completed task state, `implementation-state.md`, convergence, and fresh verification evidence |
 
-## Quick start
+The split is an authority boundary. Refinement may create and revise design artifacts but never application code. Implementation may change the code and tests required by the approved handoff but never silently change product scope or architecture.
 
-Start a new Codex CLI session in the repository you want to refine, then run:
-
-```text
-$idea-refinery-full Build a collaborative idea-review workspace for product teams.
-```
-
-For one-session tryout instructions and global installation, see [setup.md](setup.md).
-
-## Full workflow
+## End-to-end lifecycle
 
 ```text
-Idea
-  -> Superpowers brainstorming
-  -> approved design + Spec Kit Spec v1
-  -> CEO, product, and architect reviews
-  -> gstack-style synthesis + Spec v2
-  -> Spec Kit clarification
-  -> Spec Kit plan + tasks
-  -> Spec Kit analysis
-  -> resolve material gaps
-  -> implementation handoff
+Rough idea
+  -> $idea-refinery-full
+       -> repository and Spec Kit setup
+       -> Superpowers brainstorming
+       -> Spec v1
+       -> independent CEO + Product + Architect reviews
+       -> synthesis and Spec v2
+       -> clarification
+       -> technical plan and tasks
+       -> consistency analysis and bounded repair
+       -> READY FOR IMPLEMENTATION
+  -> separate user invocation
+  -> $idea-refinery-implement
+       -> readiness and traceability preflight
+       -> dependency-safe task waves
+       -> isolated red-green-refactor workers
+       -> independent wave review
+       -> Spec Kit convergence
+       -> fresh final verification
+       -> IMPLEMENTATION COMPLETE
+  -> optional gstack review / ship workflow
 ```
 
-The workflow is intentionally sequential at decision points and independent at review points. Reviewers do not rewrite the spec directly; their findings flow into an audit ledger, then a synthesis pass resolves each finding.
+Use the architecture documents for the exact stage boundaries:
 
-Full mode uses a hybrid runtime. The active Codex session discovers its available models and dispatches independent CEO, Product, and Architect workers. The bundled Python sidecar validates contracts, persists crash-safe run manifests, builds coverage matrices, tracks bounded repair checkpoints, and runs offline replay evals. It never calls provider APIs or model CLIs.
+- [Full refinement architecture](idea-refinery-full/ARCHITECTURE.md)
+- [Implementation architecture](idea-refinery-implement/ARCHITECTURE.md)
+- [Repository and file structure](RepoStructure.md)
 
-The defaults are CEO `gpt-5.5`, Product `gpt-5.6-terra`, Architect `gpt-5.6-sol` (all high reasoning), Eval `gpt-5.6-luna` (medium), and Baseline `gpt-5.4` (medium), each with the ordered fallbacks described in the feature plan. Override them with a versioned `overrides.roles` block in the invocation or `.idea-refinery/config.yaml`; precedence is invocation → repository → bundled defaults.
+## Prerequisites
 
-Deterministic checks can run without a live model session:
+For refinement:
+
+- Codex with skill support
+- Superpowers `brainstorming`
+- gstack `plan-ceo-review` and `plan-eng-review`
+- Spec Kit's `specify` CLI and repository-local `speckit-*` skills
+
+If the target repository is not a Spec Kit project, `$idea-refinery-full` explains and requests approval before running:
 
 ```bash
-uv run --directory idea-refinery-full --project . pytest
+specify init --here --integration codex --integration-options="--skills"
 ```
 
-Blocking CI uses contracts, property/integration tests, approved replay fixtures, and traceability. Live three-model versus single-model comparisons are explicitly promoted into replay fixtures only after review and calibration.
+For implementation, the active feature must have:
 
-## Skills and responsibilities
+- `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md`;
+- a `ready-for-implementation` or explicitly waived `ready-for-implementation-degraded` verdict;
+- no unresolved material decision or blocker/critical/high finding;
+- complete requirement-to-task traceability.
 
-| Stage | Skill or component | Reads | Produces |
-| --- | --- | --- | --- |
-| Discovery | `$brainstorming` (Superpowers) | The raw idea, repository context, project instructions | One-question-at-a-time discovery, 2–3 approaches, trade-offs, and an approved design direction |
-| Spec v1 | `$speckit-specify` | Approved design and Spec Kit project principles | Initial feature `spec.md` |
-| CEO review | `$plan-ceo-review` (gstack) | Spec v1 and relevant repository context | Value, positioning, scope, and strategic-risk findings |
-| Product review | Idea Refinery’s product critic | Spec v1 | User-journey, value, and requirement findings |
-| Architect review | `$plan-eng-review` (gstack) | Spec v1 and relevant repository context | Feasibility, architecture, reliability, security, operational, and test-strategy findings |
-| Synthesis | Idea Refinery | The three independent review artifacts and `refinery-state.md` | Spec v2 and a resolved review ledger |
-| Clarification | `$speckit-clarify` | Active `spec.md`, `.specify/` project configuration | Up to five high-impact clarification answers written into `spec.md` |
-| Design and tasking | `$speckit-plan`, `$speckit-tasks` | Clarified spec and project constitution | `plan.md` and `tasks.md` |
-| Consistency gate | `$speckit-analyze` | `spec.md`, `plan.md`, `tasks.md`, and project constitution | Read-only coverage, ambiguity, terminology, and consistency report |
+The implementation skill prefers Superpowers subagent, TDD, debugging, review, and verification components. When one is unavailable, it records `composition: local-fallback` and applies the same evidence gates locally. Missing optional composition never relaxes readiness, isolation, review, or verification.
 
-## Inputs
+## Try refinement in one session
 
-### Required inputs
+You can test the checkout without changing global skill registration. Start Codex in the repository whose idea you want to refine and explicitly point it at the local skill source:
 
-- The idea supplied after `$idea-refinery-full`.
-- The active repository’s source, tests, existing specifications, and project instructions such as `AGENTS.md`.
-- User decisions made during discovery. These are retained in the decision queue and are not reopened without new evidence.
+```bash
+codex --cd /absolute/path/to/target-repository \
+  "Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-full/SKILL.md. Refine this idea: <describe your idea>"
+```
 
-- The globally installed Superpowers brainstorming skill: `~/.codex/skills/brainstorming/SKILL.md`.
-- The installed gstack review skills: `~/.codex/skills/gstack-plan-ceo-review/` and `~/.codex/skills/gstack-plan-eng-review/`.
-- The `specify` CLI and a Spec Kit project structure in the target repository:
+This direct-file form does not depend on `$idea-refinery-full` already being globally discoverable. The workflow first inspects the target repository, then asks for approval before initialization or artifact writes.
 
-  ```text
-  .specify/                 # constitution, templates, scripts, integration config
-  .agents/skills/           # project-local speckit-* skills
-  ```
-
-If `.specify/` is absent, full mode explains the required `specify init` operation and asks for confirmation before creating it. Initialization, specification, planning, and tasking write repository files; analysis remains read-only.
-
-## Outputs
-
-Spec Kit creates the active feature directory, normally:
+Expected result:
 
 ```text
-specs/<feature-id>/
-├── spec.md                 # Final refined product and behavioral contract
-├── plan.md                 # Final technical design and delivery approach
-├── tasks.md                # Final ordered, executable implementation worklist
-└── refinery-state.md       # Shared decisions, questions, review findings, and stage history
+target-repository/specs/<feature-id>/
+├── spec.md
+├── plan.md
+├── tasks.md
+└── refinery-state.md
 ```
 
-## Final output for implementation agents
+The final verdict is `READY FOR IMPLEMENTATION`, `READY FOR IMPLEMENTATION — DEGRADED`, or `BLOCKED ON DECISION`.
 
-**`specs/<feature-id>/tasks.md` is the final execution entry point.** Give implementation agents this file first, but require them to read its companion `spec.md` and `plan.md` before changing code. The three files form one contract:
+## Try implementation in a later session
 
-- `spec.md` says **what** must be true for users.
-- `plan.md` says **how** the system should achieve it.
-- `tasks.md` says **what to do next**, in order.
+Starting implementation in a fresh session reduces stale context and makes the authority transition explicit:
 
-The full pipeline finishes only when high-severity review and analysis findings are resolved, explicitly deferred with a trigger, or placed in a human-owned decision queue. Its handoff verdict is either `READY FOR IMPLEMENTATION` or `BLOCKED ON DECISION`.
+```bash
+codex --cd /absolute/path/to/target-repository \
+  "Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-implement/SKILL.md. Implement the active ready Idea Refinery feature."
+```
 
-`refinery-state.md` prevents component skills from asking the same underlying question twice. Before every stage, Idea Refinery passes it as a brief of settled decisions and answered questions. A question may be reopened only when new evidence changes the trade-off and the reopen rationale is recorded.
+The skill validates the handoff again, records baseline and TDD evidence, schedules at most three safely isolated workers, obtains independent review, runs up to two convergence implementation cycles, and performs fresh final verification.
 
-## Skill source and global registration
+To test the implementation skill itself against a fixture rather than a real application, follow [Spec 002's quickstart](specs/002-parallel-tdd-implementation/quickstart.md).
 
-All custom source files live in this folder:
+## Try both in the same session
+
+Start with the refinement command above. After it returns `READY FOR IMPLEMENTATION`, explicitly authorize the second skill in a new message:
 
 ```text
-idea-refinery-full/         # Full orchestration source
-README.md                   # This guide
+Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-implement/SKILL.md.
+Implement the active ready feature.
 ```
 
-Codex discovers them globally through symlinks:
+Do not combine both instructions into the initial prompt. The pause preserves the approval boundary between writing plans and changing application code.
+
+## Install both skills globally
+
+Global registration lets new Codex sessions invoke the skills by name:
+
+```bash
+REFINERY_REPO="/absolute/path/to/IdeaRefinery"
+mkdir -p ~/.codex/skills
+ln -sfn "$REFINERY_REPO/idea-refinery-full" \
+  ~/.codex/skills/idea-refinery-full
+ln -sfn "$REFINERY_REPO/idea-refinery-implement" \
+  ~/.codex/skills/idea-refinery-implement
+```
+
+Verify both links:
+
+```bash
+readlink ~/.codex/skills/idea-refinery-full
+readlink ~/.codex/skills/idea-refinery-implement
+```
+
+Start a new Codex session in the target project, then invoke:
 
 ```text
-~/.codex/skills/idea-refinery-full
+$idea-refinery-full <describe your idea>
 ```
 
-This symlink points back to this folder, so updating `SKILL.md` changes the globally available skill without duplicating custom files.
+After the resulting handoff is ready, invoke separately:
+
+```text
+$idea-refinery-implement
+```
+
+Existing Codex sessions may need restarting after skill links or instructions change. See [setup.md](setup.md) for updating, removing, and troubleshooting registrations.
+
+## Architecture summary
+
+### Refinement
+
+`$idea-refinery-full` combines an active-session controller with a deterministic Python sidecar. The controller owns dialogue, model roster capture, delegation, and all shared writes. The package under `idea-refinery-full/src/idea_refinery/` owns versioned configuration, schemas, hashes, immutable run objects, coverage, repair checkpoints, readiness, and offline evaluation. It never invokes provider APIs or model CLIs.
+
+The default reviewer roles are CEO `gpt-5.5`, Product `gpt-5.6-terra`, Architect `gpt-5.6-sol`, Eval `gpt-5.6-luna`, and Baseline `gpt-5.4`, with ordered fallbacks and effort rules in [the bundled configuration](idea-refinery-full/defaults/config.yaml). Invocation overrides take precedence over repository config, which takes precedence over bundled defaults.
+
+### Implementation
+
+`$idea-refinery-implement` keeps the controller as the only writer of shared task and state artifacts. It derives conservative write sets, requires host-enforced isolation for parallel edits, caps waves at three workers, binds implementation to recorded baseline/red/green/refactor evidence, and requires a different read-only reviewer before task promotion. `$speckit-converge` detects omitted work after the planned tasks complete; gstack `$review` remains an optional pre-landing concern.
+
+## Develop and validate
+
+Run the deterministic full-runtime suite:
+
+```bash
+uv run --project idea-refinery-full --extra dev pytest -q
+```
+
+Inspect deterministic CLI commands:
+
+```bash
+uv run --project idea-refinery-full idea-refinery --help
+```
+
+Validate the implementation skill structure with Codex's Skill Creator validator:
+
+```bash
+python3 /absolute/path/to/skill-creator/scripts/quick_validate.py \
+  idea-refinery-implement
+```
+
+The GitHub workflow currently runs deterministic tests for changes under `idea-refinery-full/`, Spec 001, and the workflow file. Documentation-only and implementation-skill changes still need local validation.
+
+## Safety boundaries
+
+Neither skill commits, pushes, opens pull requests, merges, deploys, creates issues, or performs destructive cleanup unless the user separately requests a workflow with that authority.
+
+- `$idea-refinery-full` asks before Spec Kit initialization or artifact mutation where required.
+- `$idea-refinery-implement` stops on material decisions, unexplained verification failures, unsafe write overlap, or missing independent review.
+- Review workers are read-only; shared state remains controller-owned.
+- Existing unrelated user changes are preserved.
+
+## Documentation map
+
+| Document | Reader goal |
+| --- | --- |
+| [Full refinement architecture](idea-refinery-full/ARCHITECTURE.md) | Understand stages, reviewer roles, state, repair, and readiness |
+| [Implementation architecture](idea-refinery-implement/ARCHITECTURE.md) | Understand scheduling, isolation, TDD, review, convergence, and completion |
+| [Repository structure](RepoStructure.md) | Find source, generated artifacts, configuration, tests, and use cases |
+| [Setup and tryout](setup.md) | Install, update, remove, or test both skills |
+| [Full skill entrypoint](idea-refinery-full/SKILL.md) | Read the normative refinement instructions |
+| [Implementation skill entrypoint](idea-refinery-implement/SKILL.md) | Read the normative implementation instructions |
+| [Full orchestration contract](idea-refinery-full/references/orchestration-contract.md) | Audit refinement finding/readiness rules |
+| [Implementation orchestration contract](idea-refinery-implement/references/orchestration-contract.md) | Audit worker, evidence, review, and recovery rules |
+| [Spec 001](specs/001-refinery-quality-orchestration/spec.md) | See requirements for the full deterministic runtime |
+| [Spec 002](specs/002-parallel-tdd-implementation/spec.md) | See requirements for the implementation skill |
+
+## Troubleshooting
+
+- **Skill name is not recognized**: verify both `readlink` commands, then start a new Codex session.
+- **Refinement cannot locate Spec Kit**: install `specify`; allow `$idea-refinery-full` to initialize the target only after reviewing its proposed changes.
+- **Implementation rejects the feature**: inspect `refinery-state.md` for the verdict, open decisions, unresolved high-severity findings, and missing traceability.
+- **Superpowers implementation components are absent**: the skill should record local fallback composition; it must not claim those components ran.
+- **`uv` cannot write its cache in a sandbox**: run validation in an environment where the project cache is writable or approve the narrowly scoped cache access.
