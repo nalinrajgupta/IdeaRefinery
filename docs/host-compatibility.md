@@ -41,4 +41,4 @@ python3 tools/sync_host_skills.py
 python3 tools/sync_host_skills.py --check
 ```
 
-For Hermes copies, replace the copied `idea-refinery-*` folders with the newly generated folders. Removing a host installation removes only those copied or linked skill folders, never the repository or target feature artifacts.
+For copied Copilot or Hermes installs, replace each installed `idea-refinery-*` folder with its newly generated counterpart. Validate each installed copy against the generated source, for example with `diff -r .agents/skills/idea-refinery-full <installed-skill-root>/idea-refinery-full` and the equivalent implementation-skill command; `tools/sync_host_skills.py --check` validates only the checked-in distribution. To remove an installation, delete only the copied or linked `idea-refinery-full` and `idea-refinery-implement` folders, never the repository or target feature artifacts.
