@@ -74,8 +74,9 @@ $RefineryRepo = "C:\absolute\path\to\IdeaRefinery"
 $SourceRoot = Join-Path $RefineryRepo ".agents\skills"
 $TargetRoot = Join-Path $HOME ".copilot\skills"
 $Skills = @("idea-refinery-full", "idea-refinery-implement")
-$StagingRoot = Join-Path $TargetRoot ".idea-refinery-staging-$PID"
-$BackupRoot = Join-Path $TargetRoot ".idea-refinery-backup-$PID"
+$RunId = [Guid]::NewGuid().ToString("N")
+$StagingRoot = Join-Path $TargetRoot ".idea-refinery-staging-$RunId"
+$BackupRoot = Join-Path $TargetRoot ".idea-refinery-backup-$RunId"
 
 function Get-TreeManifest([string]$Root) {
     Get-ChildItem -LiteralPath $Root -File -Recurse |
