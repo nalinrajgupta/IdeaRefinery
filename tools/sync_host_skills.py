@@ -4,8 +4,9 @@
 GitHub Copilot can discover repository skills in ``.agents/skills``. Hermes
 can use that directory as an external skill source or receive a copied skill
 directory.  The generated directories intentionally contain the canonical
-instruction body and its relative support documents so both hosts execute the
-same complete workflow.
+instruction body, its relative support documents, and the deterministic runtime
+assets so a copied installation executes the same complete workflow without a
+canonical repository checkout.
 """
 
 from __future__ import annotations
@@ -22,6 +23,13 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ("idea-refinery-full", "idea-refinery-implement")
 GENERATED_MARKER = "<!-- Generated from {source}; do not edit this copy. -->\n"
+# Assets a copied installation needs to run the deterministic adapter without a
+# canonical repository checkout.
+RUNTIME_ASSETS = {
+    "idea-refinery-full": ("src", "defaults", "schemas", "pyproject.toml", "uv.lock"),
+    "idea-refinery-implement": (),
+}
+IGNORED_RUNTIME_FILES = shutil.ignore_patterns("__pycache__", "*.pyc")
 
 
 def rendered_skill(source: Path, repository_root: Path = REPOSITORY_ROOT) -> str:
@@ -69,6 +77,22 @@ def write_distribution(destination_root: Path, repository_root: Path = REPOSITOR
                 destination_dir / "references",
                 dirs_exist_ok=True,
             )
+
+        for asset_name in RUNTIME_ASSETS[skill_name]:
+            source_asset = source_dir / asset_name
+            destination_asset = destination_dir / asset_name
+            if source_asset.is_dir():
+                shutil.copytree(
+                    source_asset,
+                    destination_asset,
+                    dirs_exist_ok=True,
+                    ignore=IGNORED_RUNTIME_FILES,
+                )
+            elif source_asset.is_file():
+                shutil.copy2(source_asset, destination_asset)
+            else:
+                raise ValueError(f"missing runtime asset {asset_name!r} in {source_dir}")
+
         validate_relative_links(destination_dir)
 
 

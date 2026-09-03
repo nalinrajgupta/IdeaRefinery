@@ -18,7 +18,7 @@ With no overrides, select the first available candidate in each ordered list: CE
 
 Users may supply a versioned `overrides.roles` block. Precedence is invocation override, repository `.idea-refinery/config.yaml`, then bundled defaults. Capture and persist the complete resolved assignment before dispatch and revalidate it at dispatch. An explicit unavailable override fails unless it supplies its own fallbacks. If an effort is unsupported, select the highest supported effort not exceeding it and record the adjustment.
 
-The deterministic adapter can be exercised with `uv run --project idea-refinery-full idea-refinery <command>`. Its roster input is a controller-captured JSON snapshot, not a provider-discovery mechanism.
+The deterministic adapter can be exercised with `uv run --project <skill-directory> idea-refinery <command>`, where `<skill-directory>` is the canonical `idea-refinery-full/` checkout or a copied installation, which bundles the same `pyproject.toml`, `src/`, `defaults/`, and `schemas/`. Its roster input is a controller-captured JSON snapshot, not a provider-discovery mechanism.
 
 ## Required setup
 

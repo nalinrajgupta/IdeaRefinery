@@ -1,6 +1,6 @@
 # Host compatibility
 
-Idea Refinery ships the same full refinement and implementation workflows for Codex, GitHub Copilot, and Hermes. The canonical sources are `idea-refinery-full/` and `idea-refinery-implement/`; run `python3 tools/sync_host_skills.py` to regenerate the portable `.agents/skills/` distribution.
+Idea Refinery ships the same full refinement and implementation workflows for Codex, GitHub Copilot, and Hermes. The canonical sources are `idea-refinery-full/` and `idea-refinery-implement/`; run `python3 tools/sync_host_skills.py` to regenerate the portable `.agents/skills/` distribution. Each generated folder bundles the deterministic runtime it needs (`pyproject.toml`, `src/`, `defaults/`, and `schemas/` for the full workflow), so a copied installation runs `uv run --project <copied-skill-directory> idea-refinery <command>` without a canonical checkout.
 
 | Host | Discovery / install | Invocation | Spec Kit setup |
 | --- | --- | --- | --- |

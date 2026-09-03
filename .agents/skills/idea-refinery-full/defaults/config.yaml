@@ -1,0 +1,28 @@
+schema_version: "1.0"
+roles:
+  ceo:
+    model: gpt-5.5
+    reasoning_effort: high
+    fallbacks: [gpt-5.6-sol, gpt-5.6-terra]
+  product:
+    model: gpt-5.6-terra
+    reasoning_effort: high
+    fallbacks: [gpt-5.6-sol, gpt-5.6-luna]
+  architect:
+    model: gpt-5.6-sol
+    reasoning_effort: high
+    fallbacks: [gpt-5.5, gpt-5.6-terra]
+  eval:
+    model: gpt-5.6-luna
+    reasoning_effort: medium
+    fallbacks: [gpt-5.6-terra, gpt-5.6-sol]
+  baseline:
+    model: gpt-5.4
+    reasoning_effort: medium
+    fallbacks: []
+execution:
+  concurrency_limit: 3
+  role_retry_limit: 1
+  coverage_followup_limit: 1
+  repair_cycle_limit: 2
+  worker_timeout_seconds: 900
