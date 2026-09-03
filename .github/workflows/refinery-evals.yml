@@ -9,6 +9,8 @@ on:
       - ".agents/skills/**"
       - "tools/**"
       - "tests/**"
+      - "README.md"
+      - "setup.md"
       - "docs/host-compatibility.md"
       - ".github/workflows/refinery-evals.yml"
   pull_request:
@@ -19,6 +21,8 @@ on:
       - ".agents/skills/**"
       - "tools/**"
       - "tests/**"
+      - "README.md"
+      - "setup.md"
       - "docs/host-compatibility.md"
       - ".github/workflows/refinery-evals.yml"
 

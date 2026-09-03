@@ -64,11 +64,17 @@ Wave verification and convergence are also different. Wave verification integrat
 
 ## Entry, readiness, and preflight
 
-The controller resolves the active feature with:
+The controller inspects both supported Spec Kit prerequisite scripts and prefers the host-native executable when both exist:
 
 ```bash
 .specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks
 ```
+
+```powershell
+.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks
+```
+
+If the host-native script is unavailable, it uses the other executable supported script. If neither script can be executed, it stops, reports both expected paths and supported script families, and directs the user to repair the repository's Spec Kit initialization or script distribution instead of skipping validation.
 
 It then, before any mutable work (including hooks, baselines that can write, snapshots, leases, worker dispatch, test generators, or validators):
 
