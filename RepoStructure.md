@@ -15,10 +15,13 @@ IdeaRefinery/
 ├── .idea-refinery/                 # optional per-repository role/config overrides
 ├── .specify/                       # Spec Kit configuration, templates, and scripts
 ├── .agents/skills/speckit-*/       # repository-local Spec Kit skills
+├── .agents/skills/idea-refinery-*/ # generated Copilot/Hermes skill distribution
 └── .github/workflows/              # deterministic runtime CI
 ```
 
 The two skill folders are intentionally separate. `idea-refinery-full/` owns refinement and stops at an implementation-ready handoff. `idea-refinery-implement/` consumes that handoff and has separate authority to edit application code and tests.
+
+`tools/sync_host_skills.py` generates `.agents/skills/idea-refinery-*` from the canonical folders and copies their required references. GitHub Copilot discovers this standard project-skill location; Hermes can use it as an external source or receive a copy under its skill home. See [host compatibility](docs/host-compatibility.md).
 
 `.idea-refinery/config.yaml` is optional and may exist in a target repository even when it is absent from this checkout. Its role assignments override bundled defaults but remain below invocation-level overrides.
 
