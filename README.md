@@ -2,7 +2,7 @@
 
 Idea Refinery turns a rough product or engineering idea into an implementation-ready contract, then executes that contract through a separately authorized, test-driven workflow.
 
-The repository provides two explicit-only Codex skills:
+The repository provides two explicit-only workflows for Codex, GitHub Copilot, and Hermes:
 
 | Skill | Use it when | Result |
 | --- | --- | --- |
@@ -42,6 +42,7 @@ Use the architecture documents for the exact stage boundaries:
 - [Full refinement architecture](idea-refinery-full/ARCHITECTURE.md)
 - [Implementation architecture](idea-refinery-implement/ARCHITECTURE.md)
 - [Repository and file structure](RepoStructure.md)
+- [Host compatibility and installation](docs/host-compatibility.md)
 
 ## Prerequisites
 

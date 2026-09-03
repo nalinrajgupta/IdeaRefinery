@@ -2,6 +2,7 @@
 name: idea-refinery-full
 description: Orchestrate Superpowers brainstorming, gstack CEO and engineering reviews, and Spec Kit clarification and analysis to turn an idea into implementation-ready spec, plan, and tasks. Use only when explicitly invoked as $idea-refinery-full.
 ---
+<!-- Generated from idea-refinery-full/SKILL.md; do not edit this copy. -->
 
 # Idea Refinery Full
 

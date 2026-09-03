@@ -1,6 +1,6 @@
 # Setup and Tryout
 
-This guide covers local-session testing and global registration for both Idea Refinery skills.
+This guide covers Codex local/global registration. For GitHub Copilot and Hermes project-skill installation, invocation, update, removal, and Spec Kit guidance, see [host compatibility](docs/host-compatibility.md).
 
 ## Choose a setup mode
 

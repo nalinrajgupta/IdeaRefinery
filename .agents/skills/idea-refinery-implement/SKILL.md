@@ -2,6 +2,7 @@
 name: idea-refinery-implement
 description: Execute an implementation-ready Spec Kit feature with dependency-safe parallel subagents, recorded test-driven development, independent review, bounded convergence, and fresh completion evidence. Use only when explicitly invoked as $idea-refinery-implement.
 ---
+<!-- Generated from idea-refinery-implement/SKILL.md; do not edit this copy. -->
 
 # Idea Refinery Implement
 
