@@ -111,10 +111,10 @@ Required kinds: `protected-path-authorization`, `validator-prerequisite`, `task`
 
 ## Decisions and blockers
 
-| ID | Owner | Decision or blocker | Options / evidence | Status |
-| --- | --- | --- | --- | --- |
-| D-004-IMPL-001 | controller | Run the prerequisite script with `SPECIFY_FEATURE_DIRECTORY=specs/004-implementor-continuity`. | No global active feature was configured; user explicitly selected Spec 004. | resolved |
-| B-004-IMPL-001 | controller | Blocker (`external-state`) for P-008 / C-018: skill-structure validation could not be executed. | Exact validator `/Users/nalin-ai/.codex/skills/skill-creator/scripts/quick_validate.py` is absent in this environment and no equivalent structural check was recorded. | open |
+| ID | Owner | Decision or blocker | Category | Options / evidence | Affected checklist items | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| D-004-IMPL-001 | controller | Run the prerequisite script with `SPECIFY_FEATURE_DIRECTORY=specs/004-implementor-continuity`. | — | No global active feature was configured; user explicitly selected Spec 004. | — | resolved |
+| B-004-IMPL-001 | controller | Skill-structure validation could not be executed. | external-state | Exact validator `/Users/nalin-ai/.codex/skills/skill-creator/scripts/quick_validate.py` is absent in this environment and no equivalent structural check was recorded. | P-008, C-018 | open |
 
 ## Verification log
 
