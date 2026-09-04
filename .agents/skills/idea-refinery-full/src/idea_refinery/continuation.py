@@ -50,6 +50,8 @@ class Blocker:
 
     category: str
     detail: str
+    derived: bool = False
+    """True when the drive loop generated this blocker and must re-evaluate it on resume."""
 
 
 @dataclass(frozen=True)
@@ -83,6 +85,11 @@ class ContinuationResult:
 
 
 def _validate_contract(state: ContinuationState) -> None:
+    if not state.checklist:
+        raise ContractError(
+            "completion-checklist-empty",
+            "continuation state requires an explicit completion checklist",
+        )
     invalid_item_ids = [
         item.item_id
         for item in state.checklist
@@ -150,6 +157,15 @@ def _validate_contract(state: ContinuationState) -> None:
     unknown_blockers = sorted({blocker.category for blocker in state.blockers} - set(_BLOCKER_VERDICTS))
     if unknown_blockers:
         raise ContractError("unknown-blocker-category", "unknown blocker category", {"categories": unknown_blockers})
+    invalid_derived = sorted(
+        blocker.category for blocker in state.blockers if type(blocker.derived) is not bool
+    )
+    if invalid_derived:
+        raise ContractError(
+            "blocker-derived-invalid",
+            "blocker derived flag must be a boolean",
+            {"categories": invalid_derived},
+        )
     unknown_outcomes = sorted(
         {resolution.outcome for resolution in state.prerequisite_resolutions}
         - _PREREQUISITE_OUTCOMES
@@ -194,10 +210,23 @@ def validate_completion_checklist(state: ContinuationState) -> None:
             "unknown terminal verdict",
             {"terminal_verdict": state.terminal_verdict},
         )
+    _validate_terminal_verdict(state)
     if state.terminal_verdict == "IMPLEMENTATION COMPLETE" and any(not item.completed for item in state.checklist):
         raise StateError(
             "incomplete-terminal-checklist",
             "completion verdict requires every checklist item to be complete",
+        )
+
+
+def _validate_terminal_verdict(state: ContinuationState) -> None:
+    """Reject a persisted terminal label outside the supported verdict contract."""
+    if state.terminal_verdict is None:
+        return
+    if not isinstance(state.terminal_verdict, str) or state.terminal_verdict not in _TERMINAL_VERDICTS:
+        raise ContractError(
+            "unknown-terminal-verdict",
+            "unknown terminal verdict",
+            {"terminal_verdict": state.terminal_verdict},
         )
 
 
@@ -340,7 +369,14 @@ def continuation_state_from_document(document: dict[str, Any]) -> ContinuationSt
             field="detail",
             item_index=item_index,
         )
-        blockers.append(Blocker(category, detail))
+        derived = item.get("derived", False)
+        if type(derived) is not bool:
+            raise ContractError(
+                "blocker-derived-invalid",
+                "blocker derived flag must be a boolean",
+                {"item_index": item_index},
+            )
+        blockers.append(Blocker(category, detail, derived))
     raw_resolutions = document.get("prerequisite_resolutions", [])
     if not isinstance(raw_resolutions, list):
         raise ContractError(
@@ -452,6 +488,18 @@ def _transition_evidence(
     return recorded if isinstance(recorded, str) and recorded.strip() else None
 
 
+def _applied_checklist(
+    checklist: tuple[CompletionItem, ...], evidence_by_item: Mapping[str, str]
+) -> tuple[CompletionItem, ...]:
+    """Persist every evidenced transition so a later stop cannot discard it."""
+    return tuple(
+        replace(item, completed=True, evidence=evidence_by_item[item.item_id])
+        if item.item_id in evidence_by_item
+        else item
+        for item in checklist
+    )
+
+
 def drive_terminal(
     state: ContinuationState,
     *,
@@ -461,13 +509,16 @@ def drive_terminal(
 ) -> ContinuationResult:
     """Complete every evidenced routine gate in deterministic workflow order."""
     _validate_contract(state)
+    _validate_terminal_verdict(state)
     results = _validated_action_results(action_results)
     granted = frozenset(granted_authorizations)
     validators = frozenset(available_validators)
-    if state.blockers:
+    recorded_blockers = tuple(blocker for blocker in state.blockers if not blocker.derived)
+    if recorded_blockers:
         verdict = _blocker_verdict(state.blockers)
         next_state = replace(state, terminal_verdict=verdict)
         return ContinuationResult(next_state, verdict, ())
+    state = replace(state, blockers=recorded_blockers)
     protected_paths = sorted(
         (
             item
@@ -538,20 +589,14 @@ def drive_terminal(
                 ),
             )
         verdict = "BLOCKED ON VERIFICATION"
-        granted_protected_path_ids = {item.item_id for item in protected_paths}
+        granted_paths = {
+            item.item_id: f"authorization granted: protected-path:{item.category}"
+            for item in protected_paths
+        }
         return ContinuationResult(
             replace(
                 state,
-                checklist=tuple(
-                    replace(
-                        item,
-                        completed=True,
-                        evidence=f"authorization granted: protected-path:{item.category}",
-                    )
-                    if item.item_id in granted_protected_path_ids
-                    else item
-                    for item in state.checklist
-                ),
+                checklist=_applied_checklist(state.checklist, granted_paths),
                 requested_authorizations=state.requested_authorizations.union(validator_requests),
                 prerequisite_resolutions=_resolution_tuple(resolution_by_category),
                 terminal_verdict=verdict,
@@ -576,11 +621,13 @@ def drive_terminal(
         blocker = Blocker(
             "external-state",
             "no recorded transition evidence for: " + ", ".join(unevidenced),
+            derived=True,
         )
         verdict = _BLOCKER_VERDICTS[blocker.category]
         return ContinuationResult(
             replace(
                 state,
+                checklist=_applied_checklist(state.checklist, evidence_by_item),
                 blockers=state.blockers + (blocker,),
                 prerequisite_resolutions=_resolution_tuple(resolution_by_category),
                 terminal_verdict=verdict,
@@ -591,12 +638,7 @@ def drive_terminal(
     completed_item_ids = tuple(item.item_id for item in pending)
     next_state = replace(
         state,
-        checklist=tuple(
-            replace(item, completed=True, evidence=evidence_by_item[item.item_id])
-            if item.item_id in evidence_by_item
-            else item
-            for item in state.checklist
-        ),
+        checklist=_applied_checklist(state.checklist, evidence_by_item),
         prerequisite_resolutions=_resolution_tuple(resolution_by_category),
         terminal_verdict="IMPLEMENTATION COMPLETE",
     )

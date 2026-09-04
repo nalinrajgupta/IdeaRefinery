@@ -63,7 +63,8 @@ Allowed resolutions are `already-authorized`, `granted`, `exact-validator`, `equ
 | 15 | C-015 | convergence | controller | C-013 | Spec 004 intent assessment; converged, no Convergence section appended (cycle 0 / 2) | complete | — | 2026-09-03 |
 | 16 | C-016 | after-hook | controller | C-015 | `git diff --check` exit 0 | complete | — | 2026-09-03 |
 | 17 | C-017 | review-correction | `/root/continuation_sidecar` | C-012 | FINAL-REVIEW-001–002 corrected; focused 38 passed, integrated 97 passed, full 119 passed | complete | — | 2026-09-03 |
-| 18 | C-018 | final-verification | controller | C-016, C-017 | T007: fresh `sync_host_skills.py --check` exit 0 and `pytest -q` 119 passed recorded; skill-structure validation (P-008) neither run nor substituted by equivalent evidence | blocked | external-state | — |
+| 18 | C-018 | final-verification | controller | C-016, C-017, C-019 | T007: fresh `sync_host_skills.py --check` exit 0 and `pytest -q` 136 passed recorded; skill-structure validation (P-008) neither run nor substituted by equivalent evidence | blocked | external-state | — |
+| 19 | C-019 | review-correction | `/root/continuation_sidecar` | C-017 | REVIEW-004–006 corrected: empty checklist rejected, persisted terminal verdict validated at drive entry, evidenced transitions persisted before a stop with re-evaluable derived blockers; focused 59 passed, integrated 118 passed, full 136 passed | complete | — | 2026-09-04 |
 
 Required kinds: `protected-path-authorization`, `validator-prerequisite`, `task`, `review`, `review-correction`, `task-promotion`, `state-recording`, `convergence`, `after-hook`, and `final-verification`.
 
@@ -78,6 +79,7 @@ Required kinds: `protected-path-authorization`, `validator-prerequisite`, `task`
 | 2026-09-03 | C-016 | C-017 | Convergence clean and after-hooks run; `git diff --check` exit 0 | yes |
 | 2026-09-03 | C-017 | C-018 | Final review corrections landed; focused 38, integrated 97, full 119 passed | yes |
 | 2026-09-03 | — | C-018 | Final verification cannot close: exact skill-structure validator absent and no equivalent evidence recorded (P-008, `external-state`) | yes |
+| 2026-09-04 | C-019 | C-018 | Review corrections REVIEW-004–006 landed; `sync_host_skills.py --check` exit 0, focused 59, integrated 118, full 136 passed | yes |
 
 ## Waves
 
@@ -110,6 +112,9 @@ Required kinds: `protected-path-authorization`, `validator-prerequisite`, `task`
 | W2-REVIEW | none | FR-001–FR-007, FR-009 / T004–T006 | Independent read-only review found no material issue | pass |
 | FINAL-REVIEW-001 | high | FR-002, FR-009, FR-010 / T001–T003 | Template-required checklist kinds initially rejected | accepted and corrected; scoped re-review addressed |
 | FINAL-REVIEW-002 | medium | FR-008 / T001–T003 | Malformed blocker documents initially raised unstable exceptions | accepted and corrected; scoped re-review addressed |
+| REVIEW-004 | high | FR-002, FR-009 / T001–T002 | An empty completion checklist drove straight to `IMPLEMENTATION COMPLETE` | accepted and corrected; empty checklists rejected as `completion-checklist-empty` |
+| REVIEW-005 | high | FR-007, FR-010 / T001–T002 | A persisted unknown terminal verdict was normalized into a fresh success | accepted and corrected; `drive_terminal` rejects unsupported persisted verdicts |
+| REVIEW-006 | high | FR-001, FR-009 / T001–T002 | A missing-evidence stop discarded evidenced transitions and blocked permanently | accepted and corrected; evidenced items persist and derived blockers are re-evaluated on resume |
 
 ## Decisions and blockers
 
@@ -136,3 +141,6 @@ Required kinds: `protected-path-authorization`, `validator-prerequisite`, `task`
 | 2026-09-03 | final correction integrated | `uv run --project idea-refinery-full --extra dev pytest -q idea-refinery-full/tests/unit idea-refinery-full/tests/contract` | 0 | 97 passed; 2 warnings |
 | 2026-09-03 | final correction full | `python3 tools/sync_host_skills.py --check`; `uv run --project idea-refinery-full --extra dev pytest -q` | 0 | distribution coherent; 119 passed; 3 existing warnings |
 | 2026-09-03 | whole-branch review | independent read-only review + scoped re-review | 0 | final findings addressed; no open high/critical findings |
+| 2026-09-04 | REVIEW-004–006 focused | `pytest -q idea-refinery-full/tests/unit/test_continuation.py idea-refinery-full/tests/contract/test_continuation_replay.py` | 0 | 59 passed |
+| 2026-09-04 | REVIEW-004–006 integrated | `pytest -q idea-refinery-full/tests/unit idea-refinery-full/tests/contract` | 0 | 118 passed; 2 warnings |
+| 2026-09-04 | REVIEW-004–006 full | `python3 tools/sync_host_skills.py --check`; `pytest -q` (sidecar); `pytest -q tests` (repository) | 0 | distribution coherent; 136 passed; 9 repository tests passed |

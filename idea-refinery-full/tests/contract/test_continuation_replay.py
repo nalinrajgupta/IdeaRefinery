@@ -126,6 +126,46 @@ def test_replay_document_rejects_non_string_terminal_verdict() -> None:
         continuation.continuation_state_from_document({"terminal_verdict": []})
 
 
+def test_replay_document_without_a_checklist_cannot_reach_a_terminal_drive() -> None:
+    """Catches an empty replay document being driven straight to completion."""
+    state = continuation.continuation_state_from_document({})
+
+    with pytest.raises(ContractError, match="explicit completion checklist"):
+        continuation.drive_terminal(state)
+
+
+def test_replay_document_preserves_derived_blockers() -> None:
+    """Catches a resumed run losing the re-evaluable marker of a generated blocker."""
+    document = {
+        "checklist": [{"item_id": "verify", "kind": "final-verification"}],
+        "blockers": [
+            {
+                "category": "external-state",
+                "detail": "no recorded transition evidence for: verify",
+                "derived": True,
+            }
+        ],
+    }
+
+    state = continuation.continuation_state_from_document(document)
+    result = continuation.drive_terminal(state, action_results={"verify": "full suite passed"})
+
+    assert state.blockers[0].derived is True
+    assert result.verdict == "IMPLEMENTATION COMPLETE"
+
+
+def test_replay_document_rejects_non_boolean_derived_blocker_flag() -> None:
+    """Catches a truthy non-boolean flag turning a recorded stop into a re-evaluable one."""
+    document = {
+        "blockers": [{"category": "external-state", "detail": "recorded", "derived": "true"}]
+    }
+
+    with pytest.raises(ContractError) as caught:
+        continuation.continuation_state_from_document(document)
+
+    assert caught.value.code == "blocker-derived-invalid"
+
+
 @pytest.mark.parametrize(
     ("blockers", "code"),
     [

@@ -267,16 +267,70 @@ def test_completion_checklist_rejects_pending_work_for_nonterminal_verdicts(
 
 def test_completion_checklist_rejects_unknown_terminal_verdict() -> None:
     """Catches persisted terminal labels outside the sidecar's verdict contract."""
-    state = continuation.ContinuationState(checklist=(), terminal_verdict="UNKNOWN VERDICT")
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "verify", "final-verification", completed=True, evidence="full suite passed"
+            ),
+        ),
+        terminal_verdict="UNKNOWN VERDICT",
+    )
 
     with pytest.raises(ContractError, match="unknown terminal verdict"):
         continuation.validate_completion_checklist(state)
 
 
+@pytest.mark.parametrize("terminal_verdict", ["", "IN PROGRESS"])
+def test_completion_checklist_rejects_unsupported_verdict_on_a_complete_checklist(
+    terminal_verdict: str,
+) -> None:
+    """Catches a falsey or unsupported verdict passing terminal-state validation."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "verify", "final-verification", completed=True, evidence="full suite passed"
+            ),
+        ),
+        terminal_verdict=terminal_verdict,
+    )
+
+    with pytest.raises(ContractError, match="unknown terminal verdict"):
+        continuation.validate_completion_checklist(state)
+
+
+@pytest.mark.parametrize("terminal_verdict", ["", "IN PROGRESS", "UNKNOWN VERDICT"])
+def test_drive_terminal_rejects_unknown_persisted_terminal_verdict(
+    terminal_verdict: str,
+) -> None:
+    """Catches malformed replay verdicts being normalized into a fresh success."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "verify", "final-verification", completed=True, evidence="full suite passed"
+            ),
+        ),
+        terminal_verdict=terminal_verdict,
+    )
+
+    with pytest.raises(ContractError, match="unknown terminal verdict"):
+        continuation.drive_terminal(state)
+
+
+def test_empty_checklist_is_rejected() -> None:
+    """Catches a missing replay checklist bypassing every completion gate."""
+    state = continuation.ContinuationState(checklist=())
+
+    with pytest.raises(ContractError, match="explicit completion checklist"):
+        continuation.validate_completion_checklist(state)
+
+    with pytest.raises(ContractError, match="explicit completion checklist"):
+        continuation.drive_terminal(state)
+
+
 def test_unknown_blocker_category_is_rejected() -> None:
     """Catches accidental expansion of the blocker taxonomy beyond authorized stops."""
     state = continuation.ContinuationState(
-        checklist=(),
+        checklist=(continuation.CompletionItem("tasks", "task-promotion"),),
         blockers=(continuation.Blocker("routine-pause", "not a genuine blocker"),),
     )
 
@@ -299,6 +353,46 @@ def test_unevidenced_pending_work_blocks_instead_of_claiming_completion() -> Non
     assert result.completed_item_ids == ()
     assert result.state.blockers[-1].category == "external-state"
     assert "verify" in result.state.blockers[-1].detail
+
+
+def test_missing_evidence_persists_completed_gates_and_resumes_when_evidence_arrives() -> None:
+    """Catches a missing-evidence stop discarding transitions or blocking permanently."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("tasks", "task-promotion", evidence="T001 promoted"),
+            continuation.CompletionItem("verify", "final-verification"),
+        )
+    )
+
+    blocked = continuation.drive_terminal(state)
+    tasks_item = next(item for item in blocked.state.checklist if item.item_id == "tasks")
+    resumed = continuation.drive_terminal(
+        blocked.state, action_results={"verify": "full suite passed"}
+    )
+
+    assert blocked.verdict == "BLOCKED ON VERIFICATION"
+    assert tasks_item.completed is True
+    assert tasks_item.evidence == "T001 promoted"
+    assert blocked.state.blockers[-1].derived is True
+    assert resumed.verdict == "IMPLEMENTATION COMPLETE"
+    assert resumed.completed_item_ids == ("verify",)
+    assert resumed.state.blockers == ()
+
+
+def test_recorded_blocker_is_not_re_evaluated_by_new_evidence() -> None:
+    """Catches a user-recorded stop being cleared by routine action results."""
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("verify", "final-verification"),),
+        blockers=(continuation.Blocker("material-decision", "Choose retention policy"),),
+    )
+
+    result = continuation.drive_terminal(
+        state, action_results={"verify": "full suite passed"}
+    )
+
+    assert result.verdict == "BLOCKED ON DECISION"
+    assert result.state.blockers == state.blockers
+    assert result.completed_item_ids == ()
 
 
 def test_action_result_evidence_completes_a_previously_unevidenced_gate() -> None:
