@@ -133,6 +133,39 @@ def test_granted_protected_path_resumes_and_completes_the_drive() -> None:
     assert result.completed_item_ids == ("tasks-output", "tasks")
 
 
+def test_granted_protected_path_persists_when_a_later_validator_gate_blocks() -> None:
+    """Catches a validator blocker discarding protected-path grants from the same drive."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "tasks-output",
+                "protected-path-authorization",
+                category="specs/004/tasks.md",
+            ),
+            continuation.CompletionItem(
+                "validator",
+                "validator-prerequisite",
+                category="PyYAML",
+            ),
+        )
+    )
+
+    first = continuation.drive_terminal(
+        state,
+        granted_authorizations={"protected-path:specs/004/tasks.md"},
+    )
+    resolved = continuation.drive_terminal(first.state, available_validators={"PyYAML"})
+
+    assert first.verdict == "BLOCKED ON VERIFICATION"
+    tasks_output_item = next(
+        item for item in first.state.checklist if item.item_id == "tasks-output"
+    )
+    assert tasks_output_item.completed is True
+    assert tasks_output_item.evidence == "authorization granted: protected-path:specs/004/tasks.md"
+    assert resolved.verdict == "IMPLEMENTATION COMPLETE"
+    assert resolved.completed_item_ids == ("validator",)
+
+
 def test_missing_validator_is_an_external_blocker_with_one_remediation_request() -> None:
     """Catches validation being skipped or repeatedly requesting the same prerequisite."""
     state = continuation.ContinuationState(

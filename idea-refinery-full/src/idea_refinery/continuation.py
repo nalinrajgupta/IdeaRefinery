@@ -538,9 +538,20 @@ def drive_terminal(
                 ),
             )
         verdict = "BLOCKED ON VERIFICATION"
+        granted_protected_path_ids = {item.item_id for item in protected_paths}
         return ContinuationResult(
             replace(
                 state,
+                checklist=tuple(
+                    replace(
+                        item,
+                        completed=True,
+                        evidence=f"authorization granted: protected-path:{item.category}",
+                    )
+                    if item.item_id in granted_protected_path_ids
+                    else item
+                    for item in state.checklist
+                ),
                 requested_authorizations=state.requested_authorizations.union(validator_requests),
                 prerequisite_resolutions=_resolution_tuple(resolution_by_category),
                 terminal_verdict=verdict,
