@@ -380,6 +380,21 @@ def continuation_state_from_document(document: dict[str, Any]) -> ContinuationSt
             item_index=item_index,
         )
         resolutions.append(PrerequisiteResolution(category, outcome, evidence))
+    raw_requested_authorizations = document.get("requested_authorizations", [])
+    if not isinstance(raw_requested_authorizations, list):
+        raise ContractError(
+            "requested-authorizations-invalid",
+            "requested authorizations must be a list",
+        )
+    requested_authorizations = frozenset(
+        _require_nonempty_string(
+            value,
+            code="requested-authorization-invalid",
+            field="requested_authorizations",
+            item_index=item_index,
+        )
+        for item_index, value in enumerate(raw_requested_authorizations)
+    )
     terminal_verdict = document.get("terminal_verdict")
     if terminal_verdict is not None and not isinstance(terminal_verdict, str):
         raise ContractError(
@@ -388,7 +403,7 @@ def continuation_state_from_document(document: dict[str, Any]) -> ContinuationSt
         )
     return ContinuationState(
         checklist=checklist,
-        requested_authorizations=frozenset(document.get("requested_authorizations", [])),
+        requested_authorizations=requested_authorizations,
         blockers=tuple(blockers),
         prerequisite_resolutions=tuple(resolutions),
         terminal_verdict=terminal_verdict,
