@@ -304,6 +304,16 @@ def test_duplicate_item_ids_are_rejected() -> None:
         continuation.validate_completion_checklist(state)
 
 
+def test_empty_item_id_is_rejected() -> None:
+    """Catches a direct-state checklist item with an empty item id."""
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("", "task", evidence="done"),)
+    )
+
+    with pytest.raises(ContractError, match="item_id must be a non-empty string"):
+        continuation.validate_completion_checklist(state)
+
+
 @pytest.mark.parametrize("action_results", [{"verify": ""}, {"": "evidence"}, {"verify": 7}])
 def test_malformed_action_results_are_rejected(action_results: object) -> None:
     """Catches malformed action results being treated as completion evidence."""

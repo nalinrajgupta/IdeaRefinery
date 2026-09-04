@@ -83,6 +83,17 @@ class ContinuationResult:
 
 
 def _validate_contract(state: ContinuationState) -> None:
+    invalid_item_ids = [
+        item.item_id
+        for item in state.checklist
+        if not isinstance(item.item_id, str) or not item.item_id.strip()
+    ]
+    if invalid_item_ids:
+        raise ContractError(
+            "completion-item-id-invalid",
+            "completion checklist item_id must be a non-empty string",
+            {"item_ids": invalid_item_ids},
+        )
     invalid_completed = [
         item.item_id for item in state.checklist if type(item.completed) is not bool
     ]
