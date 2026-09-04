@@ -140,9 +140,36 @@ def _validate_contract(state: ContinuationState) -> None:
             "completion checklist item ids must be unique",
             {"item_ids": sorted(duplicate_item_ids)},
         )
+    invalid_kinds = [
+        item.item_id
+        for item in state.checklist
+        if not isinstance(item.kind, str) or not item.kind.strip()
+    ]
+    if invalid_kinds:
+        raise ContractError(
+            "completion-kind-invalid",
+            "completion checklist kind must be a non-empty string",
+            {"item_ids": invalid_kinds},
+        )
     unknown_kinds = sorted({item.kind for item in state.checklist} - set(_INTERNAL_ORDER))
     if unknown_kinds:
         raise ContractError("unknown-completion-kind", "unknown completion checklist kind", {"kinds": unknown_kinds})
+    invalid_blockers = sorted(
+        str(blocker.category)
+        for blocker in state.blockers
+        if (
+            not isinstance(blocker.category, str)
+            or not blocker.category.strip()
+            or not isinstance(blocker.detail, str)
+            or not blocker.detail.strip()
+        )
+    )
+    if invalid_blockers:
+        raise ContractError(
+            "blocker-invalid",
+            "blockers require category and detail",
+            {"categories": invalid_blockers},
+        )
     unscoped_preflight = sorted(
         item.item_id
         for item in state.checklist
@@ -166,6 +193,22 @@ def _validate_contract(state: ContinuationState) -> None:
             "blocker derived flag must be a boolean",
             {"categories": invalid_derived},
         )
+    invalid_resolution_fields = sorted(
+        str(resolution.category)
+        for resolution in state.prerequisite_resolutions
+        if not isinstance(resolution.category, str)
+        or not resolution.category.strip()
+        or not isinstance(resolution.outcome, str)
+        or not resolution.outcome.strip()
+        or not isinstance(resolution.evidence, str)
+        or not resolution.evidence.strip()
+    )
+    if invalid_resolution_fields:
+        raise ContractError(
+            "prerequisite-resolution-invalid",
+            "prerequisite resolution requires category, outcome, and evidence",
+            {"categories": invalid_resolution_fields},
+        )
     unknown_outcomes = sorted(
         {resolution.outcome for resolution in state.prerequisite_resolutions}
         - _PREREQUISITE_OUTCOMES
@@ -176,27 +219,29 @@ def _validate_contract(state: ContinuationState) -> None:
             "unknown prerequisite resolution outcome",
             {"outcomes": unknown_outcomes},
         )
-    invalid_resolutions = [
-        resolution.category
-        for resolution in state.prerequisite_resolutions
-        if not resolution.category.strip() or not resolution.evidence.strip()
-    ]
-    if invalid_resolutions:
+    seen_resolution_categories: set[str] = set()
+    duplicate_resolution_categories: set[str] = set()
+    for resolution in state.prerequisite_resolutions:
+        if resolution.category in seen_resolution_categories:
+            duplicate_resolution_categories.add(resolution.category)
+        seen_resolution_categories.add(resolution.category)
+    if duplicate_resolution_categories:
         raise ContractError(
-            "prerequisite-resolution-invalid",
-            "prerequisite resolution requires category and evidence",
-            {"categories": invalid_resolutions},
+            "prerequisite-resolution-duplicate",
+            "prerequisite resolution categories must be unique",
+            {"categories": sorted(duplicate_resolution_categories)},
         )
 
 
 def validate_completion_checklist(state: ContinuationState) -> None:
     """Reject unsupported blockers and unsafe non-terminal pauses."""
     _validate_contract(state)
-    pending_internal = [
-        item.item_id
+    pending_internal_items = [
+        item
         for item in state.checklist
         if not item.completed and item.kind in _INTERNAL_ORDER and _INTERNAL_ORDER[item.kind] >= 0
     ]
+    pending_internal = [item.item_id for item in pending_internal_items]
     is_terminal = state.terminal_verdict in _TERMINAL_VERDICTS
     if not is_terminal and pending_internal:
         raise StateError(
@@ -216,6 +261,8 @@ def validate_completion_checklist(state: ContinuationState) -> None:
             "incomplete-terminal-checklist",
             "completion verdict requires every checklist item to be complete",
         )
+    if state.terminal_verdict in _BLOCKER_VERDICTS.values():
+        _validate_blocked_terminal_state(state, pending_internal_items)
 
 
 def _validate_terminal_verdict(state: ContinuationState) -> None:
@@ -233,6 +280,67 @@ def _validate_terminal_verdict(state: ContinuationState) -> None:
 def _blocker_verdict(blockers: tuple[Blocker, ...]) -> str:
     verdicts = {_BLOCKER_VERDICTS[blocker.category] for blocker in blockers}
     return "BLOCKED ON DECISION" if "BLOCKED ON DECISION" in verdicts else "BLOCKED ON VERIFICATION"
+
+
+def _validate_blocked_terminal_state(
+    state: ContinuationState, pending_items: list[CompletionItem]
+) -> None:
+    if not state.blockers:
+        raise StateError(
+            "terminal-blocker-missing",
+            "blocked terminal verdict requires blocker records",
+        )
+    expected_verdict = _blocker_verdict(state.blockers)
+    if state.terminal_verdict != expected_verdict:
+        raise StateError(
+            "terminal-verdict-blocker-mismatch",
+            "blocked terminal verdict must match blocker categories",
+            {"terminal_verdict": state.terminal_verdict, "blocker_verdict": expected_verdict},
+        )
+    blocker_text = "\n".join(blocker.detail for blocker in state.blockers)
+    uncovered_items = [
+        item.item_id
+        for item in pending_items
+        if item.item_id not in blocker_text and (not item.category or item.category not in blocker_text)
+    ]
+    if uncovered_items:
+        raise StateError(
+            "incomplete-checklist-blocker-missing",
+            "blocked terminal verdict requires blockers for every incomplete checklist item",
+            {"item_ids": uncovered_items},
+        )
+
+
+def _completion_sort_key(item: CompletionItem) -> tuple[int, str]:
+    return (_INTERNAL_ORDER[item.kind], item.item_id)
+
+
+def _cleared_later_routine_evidence(
+    checklist: tuple[CompletionItem, ...], earliest_pending_key: tuple[int, str]
+) -> tuple[CompletionItem, ...]:
+    """Invalidate gates whose evidence would be stale after an earlier pending gate."""
+    return tuple(
+        replace(item, completed=False, evidence=None)
+        if _INTERNAL_ORDER[item.kind] >= 0
+        and _completion_sort_key(item) > earliest_pending_key
+        and (item.completed or item.evidence)
+        else item
+        for item in checklist
+    )
+
+
+def _cleared_later_completed_gates(
+    checklist: tuple[CompletionItem, ...], earliest_pending_key: tuple[int, str]
+) -> tuple[CompletionItem, ...]:
+    """Invalidate completed later gates before advancing an earlier pending gate."""
+    return tuple(
+        replace(item, completed=False, evidence=None)
+        if _INTERNAL_ORDER[item.kind] >= 0
+        and _completion_sort_key(item) > earliest_pending_key
+        and item.completed
+        else item
+        for item in checklist
+    )
 
 
 def _new_authorization_requests(
@@ -515,7 +623,7 @@ def drive_terminal(
     validators = frozenset(available_validators)
     recorded_blockers = tuple(blocker for blocker in state.blockers if not blocker.derived)
     if recorded_blockers:
-        verdict = _blocker_verdict(state.blockers)
+        verdict = _blocker_verdict(recorded_blockers)
         next_state = replace(state, terminal_verdict=verdict)
         return ContinuationResult(next_state, verdict, ())
     state = replace(state, blockers=recorded_blockers)
@@ -538,10 +646,19 @@ def drive_terminal(
         state.requested_authorizations,
     )
     if missing_paths:
+        blocker = Blocker(
+            "missing-authority",
+            "missing protected-path authorization for: "
+            + ", ".join(
+                f"{item.item_id} (protected-path:{item.category})" for item in missing_paths
+            ),
+            derived=True,
+        )
         verdict = "BLOCKED ON DECISION"
         return ContinuationResult(
             replace(
                 state,
+                blockers=state.blockers + (blocker,),
                 requested_authorizations=state.requested_authorizations.union(authorization_requests),
                 terminal_verdict=verdict,
             ),
@@ -588,6 +705,12 @@ def drive_terminal(
                     "no exact validator or equivalent evidence available",
                 ),
             )
+        blocker = Blocker(
+            "external-state",
+            "missing validator prerequisite for: "
+            + ", ".join(f"{item.item_id} (validator:{item.category})" for item in missing_validators),
+            derived=True,
+        )
         verdict = "BLOCKED ON VERIFICATION"
         granted_paths = {
             item.item_id: f"authorization granted: protected-path:{item.category}"
@@ -597,6 +720,7 @@ def drive_terminal(
             replace(
                 state,
                 checklist=_applied_checklist(state.checklist, granted_paths),
+                blockers=state.blockers + (blocker,),
                 requested_authorizations=state.requested_authorizations.union(validator_requests),
                 prerequisite_resolutions=_resolution_tuple(resolution_by_category),
                 terminal_verdict=verdict,
@@ -607,16 +731,29 @@ def drive_terminal(
         )
     pending = sorted(
         (item for item in state.checklist if not item.completed),
-        key=lambda item: (_INTERNAL_ORDER[item.kind], item.item_id),
+        key=_completion_sort_key,
     )
+    if pending:
+        cleared_checklist = _cleared_later_completed_gates(
+            state.checklist, _completion_sort_key(pending[0])
+        )
+        if cleared_checklist != state.checklist:
+            state = replace(state, checklist=cleared_checklist)
+            pending = sorted(
+                (item for item in state.checklist if not item.completed),
+                key=_completion_sort_key,
+            )
     evidence_by_item: dict[str, str] = {}
     unevidenced: list[str] = []
+    first_unevidenced_key: tuple[int, str] | None = None
     for item in pending:
         evidence = _transition_evidence(item, results, resolution_by_category, granted)
         if evidence:
             evidence_by_item[item.item_id] = evidence
         else:
             unevidenced.append(item.item_id)
+            first_unevidenced_key = _completion_sort_key(item)
+            break
     if unevidenced:
         blocker = Blocker(
             "external-state",
@@ -624,10 +761,15 @@ def drive_terminal(
             derived=True,
         )
         verdict = _BLOCKER_VERDICTS[blocker.category]
+        applied_checklist = _applied_checklist(state.checklist, evidence_by_item)
+        if first_unevidenced_key is not None:
+            applied_checklist = _cleared_later_routine_evidence(
+                applied_checklist, first_unevidenced_key
+            )
         return ContinuationResult(
             replace(
                 state,
-                checklist=_applied_checklist(state.checklist, evidence_by_item),
+                checklist=applied_checklist,
                 blockers=state.blockers + (blocker,),
                 prerequisite_resolutions=_resolution_tuple(resolution_by_category),
                 terminal_verdict=verdict,

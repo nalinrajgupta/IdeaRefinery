@@ -86,6 +86,14 @@ def test_protected_path_is_requested_once_before_any_internal_mutation() -> None
     assert first.verdict == "BLOCKED ON DECISION"
     assert first.completed_item_ids == ()
     assert first.authorization_requests == ("protected-path:specs/004/tasks.md",)
+    assert first.state.blockers == (
+        continuation.Blocker(
+            "missing-authority",
+            "missing protected-path authorization for: "
+            "tasks-output (protected-path:specs/004/tasks.md)",
+            derived=True,
+        ),
+    )
     assert second.authorization_requests == ()
 
 
@@ -185,6 +193,13 @@ def test_missing_validator_is_an_external_blocker_with_one_remediation_request()
 
     assert first.verdict == "BLOCKED ON VERIFICATION"
     assert first.authorization_requests == ("validator:PyYAML",)
+    assert first.state.blockers == (
+        continuation.Blocker(
+            "external-state",
+            "missing validator prerequisite for: validator (validator:PyYAML)",
+            derived=True,
+        ),
+    )
     assert second.authorization_requests == ()
     assert resolved.verdict == "IMPLEMENTATION COMPLETE"
     assert resolved.completed_item_ids == ("validator", "verify")
@@ -277,6 +292,41 @@ def test_completion_checklist_rejects_unknown_terminal_verdict() -> None:
     )
 
     with pytest.raises(ContractError, match="unknown terminal verdict"):
+        continuation.validate_completion_checklist(state)
+
+
+def test_completion_checklist_rejects_blocked_verdict_without_blockers() -> None:
+    """Catches a blocked terminal label being trusted without blocker evidence."""
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("state", "state-recording"),),
+        terminal_verdict="BLOCKED ON VERIFICATION",
+    )
+
+    with pytest.raises(StateError, match="requires blocker records"):
+        continuation.validate_completion_checklist(state)
+
+
+def test_completion_checklist_rejects_blocked_verdict_blocker_mismatch() -> None:
+    """Catches a blocked terminal label disagreeing with blocker categories."""
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("state", "state-recording"),),
+        blockers=(continuation.Blocker("missing-authority", "state needs authority"),),
+        terminal_verdict="BLOCKED ON VERIFICATION",
+    )
+
+    with pytest.raises(StateError, match="must match blocker categories"):
+        continuation.validate_completion_checklist(state)
+
+
+def test_completion_checklist_rejects_pending_item_without_matching_blocker() -> None:
+    """Catches blocked states that do not identify affected checklist items."""
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("state", "state-recording"),),
+        blockers=(continuation.Blocker("external-state", "validator unavailable"),),
+        terminal_verdict="BLOCKED ON VERIFICATION",
+    )
+
+    with pytest.raises(StateError, match="requires blockers for every incomplete"):
         continuation.validate_completion_checklist(state)
 
 
@@ -379,6 +429,54 @@ def test_missing_evidence_persists_completed_gates_and_resumes_when_evidence_arr
     assert resumed.state.blockers == ()
 
 
+def test_missing_evidence_stops_before_later_ordered_gates() -> None:
+    """Catches final verification being accepted before earlier task evidence exists."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("task", "task"),
+            continuation.CompletionItem("verify", "final-verification", evidence="old suite"),
+        )
+    )
+
+    blocked = continuation.drive_terminal(state)
+    resumed = continuation.drive_terminal(blocked.state, action_results={"task": "T001 done"})
+    verified = continuation.drive_terminal(
+        resumed.state, action_results={"verify": "fresh suite passed"}
+    )
+
+    verify_after_block = next(item for item in blocked.state.checklist if item.item_id == "verify")
+    verify_after_resume = next(item for item in resumed.state.checklist if item.item_id == "verify")
+    assert blocked.verdict == "BLOCKED ON VERIFICATION"
+    assert blocked.state.blockers[-1].detail == "no recorded transition evidence for: task"
+    assert verify_after_block.completed is False
+    assert verify_after_block.evidence is None
+    assert resumed.verdict == "BLOCKED ON VERIFICATION"
+    assert resumed.state.blockers[-1].detail == "no recorded transition evidence for: verify"
+    assert verify_after_resume.completed is False
+    assert verified.verdict == "IMPLEMENTATION COMPLETE"
+    assert verified.completed_item_ids == ("verify",)
+
+
+def test_earlier_gate_invalidates_completed_later_gates_until_fresh_evidence() -> None:
+    """Catches stale completed final verification surviving a newly completed task."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("task", "task"),
+            continuation.CompletionItem(
+                "verify", "final-verification", completed=True, evidence="old suite"
+            ),
+        )
+    )
+
+    result = continuation.drive_terminal(state, action_results={"task": "T001 done"})
+
+    verify_item = next(item for item in result.state.checklist if item.item_id == "verify")
+    assert result.verdict == "BLOCKED ON VERIFICATION"
+    assert result.state.blockers[-1].detail == "no recorded transition evidence for: verify"
+    assert verify_item.completed is False
+    assert verify_item.evidence is None
+
+
 def test_recorded_blocker_is_not_re_evaluated_by_new_evidence() -> None:
     """Catches a user-recorded stop being cleared by routine action results."""
     state = continuation.ContinuationState(
@@ -439,6 +537,63 @@ def test_empty_item_id_is_rejected() -> None:
 
     with pytest.raises(ContractError, match="item_id must be a non-empty string"):
         continuation.validate_completion_checklist(state)
+
+
+def test_direct_state_rejects_non_string_completion_kind() -> None:
+    """Catches direct construction raising raw TypeError for unhashable kinds."""
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("task", ["task"], evidence="done"),)
+    )
+
+    with pytest.raises(ContractError, match="kind must be a non-empty string"):
+        continuation.validate_completion_checklist(state)
+
+
+def test_direct_state_rejects_non_string_prerequisite_outcome() -> None:
+    """Catches direct construction raising raw TypeError for unhashable outcomes."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "validator",
+                "validator-prerequisite",
+                category="PyYAML",
+            ),
+        ),
+        prerequisite_resolutions=(
+            continuation.PrerequisiteResolution("PyYAML", ["exact-validator"], "available"),
+        ),
+    )
+
+    with pytest.raises(ContractError, match="requires category, outcome, and evidence"):
+        continuation.drive_terminal(state)
+
+
+def test_duplicate_prerequisite_resolution_categories_are_rejected() -> None:
+    """Catches order-dependent last-one-wins prerequisite resolution collapse."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "validator",
+                "validator-prerequisite",
+                category="PyYAML",
+            ),
+        ),
+        prerequisite_resolutions=(
+            continuation.PrerequisiteResolution(
+                "PyYAML",
+                "exact-validator",
+                "available validator: PyYAML",
+            ),
+            continuation.PrerequisiteResolution(
+                "PyYAML",
+                "unavailable",
+                "no exact validator or equivalent evidence available",
+            ),
+        ),
+    )
+
+    with pytest.raises(ContractError, match="resolution categories must be unique"):
+        continuation.drive_terminal(state)
 
 
 @pytest.mark.parametrize("action_results", [{"verify": ""}, {"": "evidence"}, {"verify": 7}])
