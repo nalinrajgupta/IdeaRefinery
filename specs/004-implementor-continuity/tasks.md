@@ -6,7 +6,7 @@
 - [X] T004 Update `idea-refinery-implement/SKILL.md` and `references/orchestration-contract.md` with preflight, automatic correction, and terminal-drive rules.
 - [X] T005 Update `references/implementation-state-template.md` with completion-checklist and progress fields.
 - [X] T006 Update README, setup, and architecture documentation for continuity semantics.
-- [X] T007 Run the deterministic suite, replay tests, skill validation, and `git diff --check`.
+- [ ] T007 Run the deterministic suite, replay tests, skill validation, and `git diff --check`.
 
 ## Requirement traceability
 

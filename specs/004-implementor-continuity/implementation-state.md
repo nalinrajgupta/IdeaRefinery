@@ -6,7 +6,7 @@
 | --- | --- |
 | Run ID | local-004-implement-2026-09-03 |
 | Feature directory | `specs/004-implementor-continuity` |
-| Status | complete |
+| Status | blocked |
 | Handoff verdict | ready-for-implementation |
 | Artifact hashes | spec `c06cfdf2`; plan `ce5811f1`; tasks `c69e4e5d`; refinery-state `d3fc8778` |
 | Initial git status | clean |
