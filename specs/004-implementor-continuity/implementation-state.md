@@ -12,8 +12,6 @@
 | Initial git status | clean |
 | Worker capacity | 3 available; sequential shared-workspace slices (no scoped worker sandbox) |
 | Convergence cycles | 0 / 2 (clean; no tasks appended) |
-| Preflight | Protected paths identified before mutation: `idea-refinery-full/`, `idea-refinery-implement/`, root docs, and this feature's coordination artifacts. Validator prerequisite: `uv` with the locked dev extra; baseline provisioned successfully. |
-| Completion checklist | T001–T007; review dispositions; corrections; convergence; after-hooks; narrow and full evidence; terminal verdict |
 
 ## Component routing
 
@@ -26,6 +24,58 @@
 | Completion | verification-before-completion | fresh commands before final verdict | Available |
 | Task semantics | speckit-implement | prerequisite, checklist, hook, and completion conventions | Available |
 | Convergence | speckit-converge | controller append-only assessment after initial pass | Available |
+
+## Preflight: authority and validator prerequisites
+
+| ID | Kind | Path or prerequisite category | Command / reason | Smallest authority or evidence needed | Exact validator / equivalent evidence | Request token | Resolution | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| P-001 | protected-path-authorization | `idea-refinery-full/` | Add continuation sidecar module, tests, and replay fixtures (T001–T003) | Write access scoped to `idea-refinery-full/src/idea_refinery/**` and `idea-refinery-full/tests/**` | n/a | `auth:004:idea-refinery-full` | already-authorized | resolved |
+| P-002 | protected-path-authorization | `idea-refinery-implement/` | Update SKILL, orchestration contract, and state template (T004–T005) | Write access scoped to `idea-refinery-implement/**` | n/a | `auth:004:idea-refinery-implement` | already-authorized | resolved |
+| P-003 | protected-path-authorization | root docs (`README.md`, `setup.md`, `docs/**`) | Document continuity semantics (T006) | Write access scoped to the three root documentation targets | n/a | `auth:004:root-docs` | already-authorized | resolved |
+| P-004 | protected-path-authorization | generated `.agents/skills/**` | Regenerate host-skill distribution via `tools/sync_host_skills.py` (T006) | Write access limited to generated copies produced by the sync tool | n/a | `auth:004:agents-skills` | already-authorized | resolved |
+| P-005 | protected-path-authorization | `specs/004-implementor-continuity/**` | Record coordination artifacts for this run | Write access scoped to this feature directory | n/a | `auth:004:feature-dir` | already-authorized | resolved |
+| P-006 | validator-prerequisite | Python test runner | `uv run --project idea-refinery-full --extra dev pytest -q` | Locked dev extra provisioned before baseline | exact-validator: baseline run exit 0, 81 passed | `val:004:pytest` | exact-validator | resolved |
+| P-007 | validator-prerequisite | host-skill distribution check | `python3 tools/sync_host_skills.py --check` | Repository-local script, no extra authority | exact-validator: exit 0, generated copies match canonical sources | `val:004:sync-check` | exact-validator | resolved |
+| P-008 | validator-prerequisite | skill-structure validation | `/Users/nalin-ai/.codex/skills/skill-creator/scripts/quick_validate.py idea-refinery-implement` | Access to the exact validator script or an equivalent structural check | exact validator path absent; no equivalent evidence recorded | `val:004:skill-structure` | external-state | blocked |
+
+Allowed resolutions are `already-authorized`, `granted`, `exact-validator`, `equivalent-evidence`, `missing-authority`, or `external-state`. `missing-authority` and `external-state` require a linked blocker below; all others permit the drive loop to continue.
+
+## Completion checklist
+
+| Order | Item ID | Kind | Owner | Dependencies | Acceptance command / evidence | Status | Blocker category | Completed at |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | C-001 | protected-path-authorization | controller | — | P-001–P-005 resolved before any mutation | complete | — | 2026-09-03 |
+| 2 | C-002 | validator-prerequisite | controller | C-001 | P-006, P-007 resolved (`pytest -q` baseline 81 passed; sync check exit 0) | complete | — | 2026-09-03 |
+| 3 | C-003 | task | `/root/continuation_sidecar` | C-002 | T001 continuation-state and completion-checklist contracts; focused suite 38 passed | complete | — | 2026-09-03 |
+| 4 | C-004 | task | `/root/continuation_sidecar` | C-003 | T002 unit and contract tests; red observed then `pytest -q tests/unit tests/contract` 91 passed | complete | — | 2026-09-03 |
+| 5 | C-005 | task | `/root/continuation_sidecar` | C-003 | T003 six replay fixtures, one per pause cause; contract suite passed | complete | — | 2026-09-03 |
+| 6 | C-006 | review | independent reviewer | C-003–C-005 | W1 read-only review; findings S1-CONT-001–003 raised | complete | — | 2026-09-03 |
+| 7 | C-007 | review-correction | `/root/continuation_sidecar` | C-006 | S1-CONT-001–003 corrected; re-review addressed | complete | — | 2026-09-03 |
+| 8 | C-008 | task-promotion | controller | C-007 | W1 promoted after re-review; mirror synchronized | complete | — | 2026-09-03 |
+| 9 | C-009 | task | `/root/continuity_skill_docs` | C-008 | T004 SKILL and orchestration-contract updates | complete | — | 2026-09-03 |
+| 10 | C-010 | task | `/root/continuity_skill_docs` | C-008 | T005 state template completion-checklist and progress fields | complete | — | 2026-09-03 |
+| 11 | C-011 | task | `/root/continuity_skill_docs` | C-009, C-010 | T006 README, setup, architecture docs; `sync_host_skills.py --check` exit 0 | complete | — | 2026-09-03 |
+| 12 | C-012 | review | independent reviewer | C-009–C-011 | W2 read-only review PASS; no findings | complete | — | 2026-09-03 |
+| 13 | C-013 | task-promotion | controller | C-012 | W2 promoted; full suite 113 passed | complete | — | 2026-09-03 |
+| 14 | C-014 | state-recording | controller | C-008, C-013 | Waves, assignments, slice evidence, findings, and verification log recorded in this document | complete | — | 2026-09-03 |
+| 15 | C-015 | convergence | controller | C-013 | Spec 004 intent assessment; converged, no Convergence section appended (cycle 0 / 2) | complete | — | 2026-09-03 |
+| 16 | C-016 | after-hook | controller | C-015 | `git diff --check` exit 0 | complete | — | 2026-09-03 |
+| 17 | C-017 | review-correction | `/root/continuation_sidecar` | C-012 | FINAL-REVIEW-001–002 corrected; focused 38 passed, integrated 97 passed, full 119 passed | complete | — | 2026-09-03 |
+| 18 | C-018 | final-verification | controller | C-016, C-017 | T007: fresh `sync_host_skills.py --check` exit 0 and `pytest -q` 119 passed recorded; skill-structure validation (P-008) neither run nor substituted by equivalent evidence | blocked | external-state | — |
+
+Required kinds: `protected-path-authorization`, `validator-prerequisite`, `task`, `review`, `review-correction`, `task-promotion`, `state-recording`, `convergence`, `after-hook`, and `final-verification`.
+
+## Progress log
+
+| Time | Completed item | Next actionable item | Action / evidence | Progress update sent |
+| --- | --- | --- | --- | --- |
+| 2026-09-03 | C-002 | C-003 | Preflight resolved; baseline `pytest -q` exit 0, 81 passed | yes |
+| 2026-09-03 | C-005 | C-006 | W1 slice delivered; focused suite 38 passed, integrated 91 passed | yes |
+| 2026-09-03 | C-008 | C-009 | W1 corrections re-reviewed and promoted; generated mirror synchronized | yes |
+| 2026-09-03 | C-013 | C-014 | W2 promoted after PASS review; `sync_host_skills.py --check` exit 0, full suite 113 passed | yes |
+| 2026-09-03 | C-016 | C-017 | Convergence clean and after-hooks run; `git diff --check` exit 0 | yes |
+| 2026-09-03 | C-017 | C-018 | Final review corrections landed; focused 38, integrated 97, full 119 passed | yes |
+| 2026-09-03 | — | C-018 | Final verification cannot close: exact skill-structure validator absent and no equivalent evidence recorded (P-008, `external-state`) | yes |
 
 ## Waves
 
@@ -64,6 +114,7 @@
 | ID | Owner | Decision or blocker | Options / evidence | Status |
 | --- | --- | --- | --- | --- |
 | D-004-IMPL-001 | controller | Run the prerequisite script with `SPECIFY_FEATURE_DIRECTORY=specs/004-implementor-continuity`. | No global active feature was configured; user explicitly selected Spec 004. | resolved |
+| B-004-IMPL-001 | controller | Blocker (`external-state`) for P-008 / C-018: skill-structure validation could not be executed. | Exact validator `/Users/nalin-ai/.codex/skills/skill-creator/scripts/quick_validate.py` is absent in this environment and no equivalent structural check was recorded. | open |
 
 ## Verification log
 
