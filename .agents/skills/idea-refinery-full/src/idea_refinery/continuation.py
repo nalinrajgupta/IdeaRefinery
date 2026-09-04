@@ -110,6 +110,18 @@ def _validate_contract(state: ContinuationState) -> None:
             "completed checklist items require recorded acceptance evidence",
             {"item_ids": unevidenced_completed},
         )
+    seen_item_ids: set[str] = set()
+    duplicate_item_ids: set[str] = set()
+    for item in state.checklist:
+        if item.item_id in seen_item_ids:
+            duplicate_item_ids.add(item.item_id)
+        seen_item_ids.add(item.item_id)
+    if duplicate_item_ids:
+        raise ContractError(
+            "completion-item-id-duplicate",
+            "completion checklist item ids must be unique",
+            {"item_ids": sorted(duplicate_item_ids)},
+        )
     unknown_kinds = sorted({item.kind for item in state.checklist} - set(_INTERNAL_ORDER))
     if unknown_kinds:
         raise ContractError("unknown-completion-kind", "unknown completion checklist kind", {"kinds": unknown_kinds})

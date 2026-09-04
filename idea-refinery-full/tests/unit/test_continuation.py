@@ -291,6 +291,19 @@ def test_completed_item_without_evidence_is_rejected() -> None:
         continuation.validate_completion_checklist(state)
 
 
+def test_duplicate_item_ids_are_rejected() -> None:
+    """Catches two gates sharing an item id, which would let evidence for one complete both."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("verify", "task"),
+            continuation.CompletionItem("verify", "final-verification"),
+        )
+    )
+
+    with pytest.raises(ContractError, match="completion checklist item ids must be unique"):
+        continuation.validate_completion_checklist(state)
+
+
 @pytest.mark.parametrize("action_results", [{"verify": ""}, {"": "evidence"}, {"verify": 7}])
 def test_malformed_action_results_are_rejected(action_results: object) -> None:
     """Catches malformed action results being treated as completion evidence."""
