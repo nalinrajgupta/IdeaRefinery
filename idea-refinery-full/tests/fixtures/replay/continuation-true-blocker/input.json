@@ -1,0 +1,8 @@
+{
+  "blockers": [
+    {"category": "material-decision", "detail": "Choose retention policy"}
+  ],
+  "checklist": [
+    {"item_id": "tasks", "kind": "task-promotion"}
+  ]
+}

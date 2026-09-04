@@ -1,0 +1,17 @@
+{
+  "checklist": [
+    {
+      "category": "PyYAML",
+      "item_id": "validator",
+      "kind": "validator-prerequisite"
+    },
+    {"evidence": "full suite passed", "item_id": "verify", "kind": "final-verification"}
+  ],
+  "prerequisite_resolutions": [
+    {
+      "category": "PyYAML",
+      "evidence": "validated schema with the locked JSON decoder",
+      "outcome": "equivalent-evidence"
+    }
+  ]
+}

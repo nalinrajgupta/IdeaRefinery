@@ -1,0 +1,7 @@
+{
+  "checklist": [
+    {"evidence": "R1 correction verified", "item_id": "review-R1", "kind": "review-correction"},
+    {"evidence": "T001 promoted", "item_id": "tasks", "kind": "task-promotion"},
+    {"evidence": "full suite passed", "item_id": "evidence", "kind": "final-verification"}
+  ]
+}

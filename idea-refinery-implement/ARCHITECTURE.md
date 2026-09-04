@@ -1,6 +1,6 @@
 # Idea Refinery Implement Architecture
 
-How `$idea-refinery-implement` turns a ready Idea Refinery handoff into reviewed, test-driven application changes without silently expanding its authority.
+How `$idea-refinery-implement` turns a ready Idea Refinery handoff into reviewed, test-driven application changes without silently expanding its authority or pausing between authorized routine gates.
 
 ## Purpose and boundary
 
@@ -12,27 +12,30 @@ It does not implement arbitrary Spec Kit features. The active feature must conta
 
 ```text
 Ready Idea Refinery handoff
-  -> entry and readiness gate
+  -> entry, readiness, and preflight authority/validator gate
+  -> explicit completion checklist
   -> requirement/task inventory
   -> conservative dependency and write-set scheduling
   -> deterministic execution waves (maximum 3 workers)
   -> isolated red-green-refactor workers
   -> controller evidence and path inspection
   -> independent read-only wave review
-  -> finding disposition, task promotion, integrated verification
+  -> automatic objective finding correction, task promotion, integrated verification
   -> Spec Kit convergence (0..2 implementation cycles)
   -> after hooks and fresh final verification
-  -> terminal implementation verdict
+  -> terminal-verdict drive loop: advance or explicitly block every item
   -> optional gstack pre-landing review
 ```
 
 Parallelism is an optimization. When isolation, path ownership, or agent capacity is insufficient, the same evidence gates run sequentially.
 
+The drive loop is foreground control flow in the active invocation, not a background monitor or scheduler. It reports milestones but does not yield because routine implementation work remains.
+
 ## Component responsibilities
 
 | Component | Responsibility | Write authority |
 | --- | --- | --- |
-| Controller | User communication, artifact interpretation, task graph, scheduling, leases, shared state, review disposition, hooks, convergence, and final claims | Sole writer of `tasks.md`, `refinery-state.md`, and `implementation-state.md`; applies approved application changes |
+| Controller | User communication, preflight, completion checklist, task graph, scheduling, leases, shared state, review disposition, objective remediation, hooks, convergence, and final claims | Sole writer of `tasks.md`, `refinery-state.md`, and `implementation-state.md`; applies approved application changes |
 | `$speckit-implement` | Prerequisite, checklist, extension-hook, artifact-loading, and task-completion conventions | Only through the controller's execution of the stage |
 | Implementation worker | One immutable task slice and its test-first implementation | Only declared source/test paths behind an enforceable boundary |
 | Superpowers components | Bounded dispatch, TDD, debugging, review, and completion verification when present | Limited to the stage contract and worker boundary |
@@ -59,7 +62,7 @@ TDD and review are complementary. TDD proves that a particular assertion changes
 
 Wave verification and convergence are also different. Wave verification integrates already planned slices. Convergence compares the finished codebase with the entire spec, plan, and task set to find omissions.
 
-## Entry and readiness
+## Entry, readiness, and preflight
 
 The controller inspects both supported Spec Kit prerequisite scripts and prefers the host-native executable when both exist:
 
@@ -73,17 +76,29 @@ The controller inspects both supported Spec Kit prerequisite scripts and prefers
 
 If the host-native script is unavailable, it uses the other executable supported script. If neither script can be executed, it stops, reports both expected paths and supported script families, and directs the user to repair the repository's Spec Kit initialization or script distribution instead of skipping validation.
 
-It then:
+It then, before any mutable work (including hooks, baselines that can write, snapshots, leases, worker dispatch, test generators, or validators):
 
 1. Requires `.specify/`, `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md`.
 2. Loads the constitution and optional research, data model, contracts, and quickstart.
-3. Runs each enabled unconditional `before_implement` hook exactly once before baseline or snapshot capture.
-4. Reports every checklist and stops for an explicit proceed decision if any item is unchecked.
-5. Accepts only `ready-for-implementation` or `ready-for-implementation-degraded`.
-6. Independently scans the decision/question registry for open, decision-needed, or reopened material decisions and scans findings for unresolved blocker, critical, or high items.
-7. Records git status, artifact hashes, baseline results, capacity, and component routing in `implementation-state.md`.
+3. Creates or resumes one completion checklist covering preflight, tasks, reviews, corrections, promotion, state, convergence, hooks, and final evidence.
+4. Identifies protected output paths and validator prerequisites, records exact-validator availability or equivalent evidence, and requests any ungranted authority once per normalized path/prerequisite category.
+5. Runs each enabled unconditional `before_implement` hook exactly once after its protected paths and prerequisites have passed preflight.
+6. Reports every feature checklist and records any required explicit proceed decision as scoped authority rather than re-asking at later routine gates.
+7. Accepts only `ready-for-implementation` or `ready-for-implementation-degraded`.
+8. Independently scans the decision/question registry for open, decision-needed, or reopened material decisions and scans findings for unresolved blocker, critical, or high items.
+9. Records git status, artifact hashes, baseline results, capacity, component routing, preflight, and checklist evidence in `implementation-state.md`.
 
 A stale ready summary cannot override an open material decision.
+
+The deterministic validation sidecar that validates continuation transitions is provider- and credential-independent. It cannot authorize paths, call a model provider, or run a background process; the controller remains responsible for the foreground workflow and is the sole shared-artifact writer.
+
+## Completion checklist and continuity
+
+An invocation is authority to finish approved routine gates. The controller repeatedly advances the earliest incomplete checklist item: preflight authorization, validator prerequisite, review correction, task promotion, state recording, convergence, and final verification. It records the owner, dependency, acceptance evidence, status, and any blocker category for every item.
+
+An objective in-scope review finding becomes a correction slice automatically. The controller performs its TDD, independent review, and verification, then resumes task promotion without a new user prompt. It asks the user only when the smallest correction requires a material product/architecture decision or authority outside the invocation boundary.
+
+Progress messages name the completed item and the next actionable one, but do not yield while a routine item remains. Only three blocker categories can terminate a run: `missing-authority`, `material-decision`, and `external-state`. The first two map to `BLOCKED ON DECISION`; the latter maps to `BLOCKED ON VERIFICATION` after exact validation and equivalent evidence have both been evaluated.
 
 ## Inventory, slicing, and scheduling
 
@@ -129,19 +144,19 @@ The controller independently inspects worker changes and command evidence, then 
 
 The reviewer checks requirement compliance first, then code quality, failure paths, test strength, declared-path compliance, and regressions. Missing, malformed, timed-out, or self-authored review produces `review-blocked`; it never implies approval.
 
-Every material finding has evidence, severity, affected requirement/task, impact, smallest correction, decision status, and disposition. Objective corrections become new TDD slices. Incorrect feedback is rejected with evidence. Material product or architecture decisions return to the user. Only after all material findings are disposed and integrated verification passes does the controller mark tasks complete.
+Every material finding has evidence, severity, affected requirement/task, impact, smallest correction, decision status, and disposition. Objective in-scope corrections become new TDD slices automatically. Incorrect feedback is rejected with evidence. Material product or architecture decisions return to the user. Only after all material findings are disposed and integrated verification passes does the controller mark tasks complete.
 
 ## Convergence
 
 After the original task list completes, the controller snapshots `tasks.md` and invokes `$speckit-converge` under its own identity. The only permitted mutation is one validated append-only Convergence section. The controller records the exact patch and hashes; any other change is rejected.
 
-Appended tasks use the same scheduler, TDD, review, and promotion gates. There are at most two convergence implementation cycles. A repeated root cause, new high-severity contradiction, or material decision stops the loop.
+Appended tasks use the same scheduler, TDD, review, correction, and promotion gates without another user prompt. There are at most two convergence implementation cycles. A repeated root cause or new high-severity contradiction is investigated and repaired when objective and in scope; the loop stops only for a material decision or external-state verification failure.
 
 ## Completion
 
 Enabled unconditional `after_implement` hooks run once after convergence and before final verification. Any hook mutation invalidates affected assignments, tests, or review evidence.
 
-The controller then runs fresh narrow, integration, and project-level verification; checks requirement-to-task-to-change-to-test traceability; verifies declared-path ownership; and confirms unrelated user changes were not incorporated. It uses Superpowers `verification-before-completion` when available or applies the same evidence-before-claims rule locally.
+The controller then runs fresh narrow, integration, and project-level verification; checks requirement-to-task-to-change-to-test traceability; verifies declared-path ownership; and confirms unrelated user changes were not incorporated. It uses Superpowers `verification-before-completion` when available or applies the same evidence-before-claims rule locally. It issues `IMPLEMENTATION COMPLETE` only after the terminal drive loop confirms every completion-checklist item is complete.
 
 The skill returns exactly one verdict:
 
@@ -158,17 +173,17 @@ The report lists completed task IDs, changed paths, commands/results, review dis
 | Failure | Result |
 | --- | --- |
 | Missing, malformed, or blocked handoff | Stop before application edits |
-| Unchecked checklist | Ask for explicit proceed authority |
+| Unchecked checklist | Request and persist one scoped proceed authority, then continue routine gates |
 | Unmapped requirement | Repair planning before dispatch |
-| Unknown, overlapping, dirty, or unenforceable write set | Serialize or use controller-applied patches |
+| Unknown, overlapping, dirty, or unenforceable write set | Serialize or use controller-applied patches; do not return an interim pause |
 | Worker needs an undeclared path | Stop, recompute ownership, and redispatch |
 | Invalid red evidence | Prohibit production edits or promotion |
-| Unexplained test failure | Use systematic debugging or reproduce, isolate, hypothesize, and test the cause |
+| Unexplained test failure | Use systematic debugging or reproduce, isolate, hypothesize, and test the cause before classifying external state |
 | One worker fails while disjoint workers succeed | Preserve inspectable work but do not promote failed or unreviewed slices |
 | Invalid reviewer result | Enter `review-blocked` and obtain a replacement reviewer |
 | Protected artifact or path drifts | Quarantine, perform three-way attribution, then re-plan and re-review |
 | Hook changes a protected input | Invalidate and rerun affected evidence |
-| Convergence repeats a root gap | Stop and report the unresolved requirement |
+| Convergence repeats a root gap | Repair an objective in-scope cause; stop only if the resolution needs a material decision or external state |
 | Material decision appears | Stop and return ownership to the user |
 
 Resume may reuse a verified wave only when artifact hashes, path hashes, commands, envelope identity, and reviewer dispositions still match.

@@ -1,0 +1,6 @@
+{
+  "authorization_requests": [],
+  "completed_item_ids": ["tasks", "state", "converge", "verify"],
+  "terminal_verdict": "IMPLEMENTATION COMPLETE",
+  "verdict": "IMPLEMENTATION COMPLETE"
+}
