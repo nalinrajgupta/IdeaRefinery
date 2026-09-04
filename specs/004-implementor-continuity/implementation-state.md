@@ -16,7 +16,7 @@
 ## Component routing
 
 | Stage | Preferred skill | Resolved implementation | Availability / degradation |
-| --- | --- | --- |
+| --- | --- | --- | --- |
 | Worker dispatch | subagent-driven-development | sequential immutable-envelope workers | Available; no parallel dispatch because the host has no scoped worker write boundary |
 | TDD | test-driven-development | recorded red-green-refactor per behavioral slice | Available |
 | Debugging | systematic-debugging | invoke only for unexplained failures | Available on demand |
