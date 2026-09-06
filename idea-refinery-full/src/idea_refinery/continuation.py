@@ -170,16 +170,17 @@ def _validate_contract(state: ContinuationState) -> None:
             "blockers require category and detail",
             {"categories": invalid_blockers},
         )
-    unscoped_preflight = sorted(
+    invalid_preflight_categories = sorted(
         item.item_id
         for item in state.checklist
-        if item.kind in {"protected-path-authorization", "validator-prerequisite"} and not item.category
+        if item.kind in {"protected-path-authorization", "validator-prerequisite"}
+        and (not isinstance(item.category, str) or not item.category.strip())
     )
-    if unscoped_preflight:
+    if invalid_preflight_categories:
         raise ContractError(
             "completion-category-missing",
-            "completion category is required for preflight gates",
-            {"item_ids": unscoped_preflight},
+            "completion category must be a non-empty string for preflight gates",
+            {"item_ids": invalid_preflight_categories},
         )
     unknown_blockers = sorted({blocker.category for blocker in state.blockers} - set(_BLOCKER_VERDICTS))
     if unknown_blockers:
