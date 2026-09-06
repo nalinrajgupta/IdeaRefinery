@@ -211,7 +211,7 @@ def _validate_contract(state: ContinuationState) -> None:
     if invalid_preflight_categories:
         raise ContractError(
             "completion-category-missing",
-            "completion category must be a non-empty string for preflight gates",
+            "completion category is required and must be a non-empty string for preflight gates",
             {"item_ids": invalid_preflight_categories},
         )
     unknown_blockers = sorted({blocker.category for blocker in state.blockers} - set(_BLOCKER_VERDICTS))
@@ -675,6 +675,8 @@ def drive_terminal(
     """Complete every evidenced routine gate in deterministic workflow order."""
     _validate_contract(state)
     _validate_terminal_verdict(state)
+    if state.terminal_verdict is not None:
+        validate_completion_checklist(state)
     results = _validated_action_results(action_results)
     granted = frozenset(granted_authorizations)
     validators = frozenset(available_validators)
@@ -704,19 +706,26 @@ def drive_terminal(
         state.requested_authorizations,
     )
     if missing_paths:
+        granted_paths = {
+            item.item_id: f"authorization granted: protected-path:{item.category}"
+            for item in protected_paths
+            if item not in missing_paths
+        }
+        applied_checklist = _applied_checklist(state.checklist, granted_paths)
         blocker = Blocker(
             "missing-authority",
             "missing protected-path authorization for: "
             + ", ".join(
                 f"{item.item_id} (protected-path:{item.category})" for item in missing_paths
             ),
-            tuple(item.item_id for item in state.checklist if not item.completed),
+            tuple(item.item_id for item in applied_checklist if not item.completed),
             derived=True,
         )
         verdict = "BLOCKED ON DECISION"
         return ContinuationResult(
             replace(
                 state,
+                checklist=applied_checklist,
                 blockers=state.blockers + (blocker,),
                 requested_authorizations=state.requested_authorizations.union(authorization_requests),
                 terminal_verdict=verdict,

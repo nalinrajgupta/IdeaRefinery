@@ -175,6 +175,41 @@ def test_granted_protected_path_persists_when_a_later_validator_gate_blocks() ->
     assert resolved.completed_item_ids == ("validator",)
 
 
+def test_partial_protected_path_grants_persist_before_another_path_blocks() -> None:
+    """Catches one missing path discarding another path's grant from the same drive."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "tasks-output",
+                "protected-path-authorization",
+                category="specs/004/tasks.md",
+            ),
+            continuation.CompletionItem(
+                "state-output",
+                "protected-path-authorization",
+                category="specs/004/implementation-state.md",
+            ),
+        )
+    )
+
+    first = continuation.drive_terminal(
+        state,
+        granted_authorizations={"protected-path:specs/004/tasks.md"},
+    )
+    resumed = continuation.drive_terminal(
+        first.state,
+        granted_authorizations={"protected-path:specs/004/implementation-state.md"},
+    )
+
+    tasks_output_item = next(
+        item for item in first.state.checklist if item.item_id == "tasks-output"
+    )
+    assert tasks_output_item.completed is True
+    assert tasks_output_item.evidence == "authorization granted: protected-path:specs/004/tasks.md"
+    assert first.state.blockers[-1].affected_item_ids == ("state-output",)
+    assert resumed.verdict == "IMPLEMENTATION COMPLETE"
+
+
 def test_missing_validator_is_an_external_blocker_with_one_remediation_request() -> None:
     """Catches validation being skipped or repeatedly requesting the same prerequisite."""
     state = continuation.ContinuationState(
@@ -391,6 +426,17 @@ def test_drive_terminal_rejects_unknown_persisted_terminal_verdict(
     )
 
     with pytest.raises(ContractError, match="unknown terminal verdict"):
+        continuation.drive_terminal(state)
+
+
+def test_drive_terminal_rejects_complete_verdict_with_pending_items() -> None:
+    """Catches a corrupt terminal state being silently re-driven into another result."""
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("verify", "final-verification"),),
+        terminal_verdict="IMPLEMENTATION COMPLETE",
+    )
+
+    with pytest.raises(StateError, match="completion verdict requires every checklist item"):
         continuation.drive_terminal(state)
 
 

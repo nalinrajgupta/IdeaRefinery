@@ -100,7 +100,7 @@ Required kinds: `protected-path-authorization`, `validator-prerequisite`, `task`
 | Slice | Task IDs | Baseline | Red | Green | Refactor | Changed paths | Review | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | S1-continuation-sidecar | T001–T003 | 81 full-suite tests passed | Expected missing contract, malformed input, terminal taxonomy, and evidence-path failures observed | 38 focused tests passed | Authorization helper and template-kind ordering clarified | continuation module, unit/contract tests, 6 replay fixtures; generated mirror synchronized | Initial 3 high + final 1 high/1 medium findings addressed by independent re-reviews | promoted |
-| S2-continuity-controller-docs | T004–T006 | S1 integrated 91 passed; expected host mirror drift | test-first inapplicable (documentation/instruction/generated-only) | sync check passed | Full suite 113 passed; docs and generated copies coherent | no findings; independent review PASS | promoted |
+| S2-continuity-controller-docs | T004–T006 | S1 integrated 91 passed; expected host mirror drift | test-first inapplicable (documentation/instruction/generated-only) | sync check passed | Full suite 113 passed; docs and generated copies coherent | canonical controller docs, generated skill copies, root docs | no findings; independent review PASS | promoted |
 
 ## Review findings
 
