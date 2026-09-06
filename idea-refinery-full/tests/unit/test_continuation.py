@@ -393,6 +393,40 @@ def test_completion_checklist_rejects_pending_item_without_matching_blocker() ->
         continuation.validate_completion_checklist(state)
 
 
+@pytest.mark.parametrize(
+    ("terminal_verdict", "blockers", "error"),
+    [
+        (
+            "IMPLEMENTATION COMPLETE",
+            (continuation.Blocker("external-state", "validator unavailable", ("verify",)),),
+            "completion verdict cannot retain blocker records",
+        ),
+        (
+            "BLOCKED ON VERIFICATION",
+            (continuation.Blocker("external-state", "validator unavailable", ("verify",)),),
+            "blocked terminal verdict requires incomplete checklist items",
+        ),
+    ],
+)
+def test_completion_checklist_rejects_verdicts_contradicting_completed_state(
+    terminal_verdict: str,
+    blockers: tuple[continuation.Blocker, ...],
+    error: str,
+) -> None:
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "verify", "final-verification", completed=True, evidence="full suite passed"
+            ),
+        ),
+        blockers=blockers,
+        terminal_verdict=terminal_verdict,
+    )
+
+    with pytest.raises(StateError, match=error):
+        continuation.validate_completion_checklist(state)
+
+
 @pytest.mark.parametrize("terminal_verdict", ["", "IN PROGRESS"])
 def test_completion_checklist_rejects_unsupported_verdict_on_a_complete_checklist(
     terminal_verdict: str,
@@ -594,6 +628,46 @@ def test_recorded_blocker_does_not_stop_unaffected_actionable_work() -> None:
     assert result.verdict == "BLOCKED ON DECISION"
     assert result.completed_item_ids == ("verify",)
     assert result.state.checklist[1].completed is True
+
+
+def test_validator_blocker_preserves_decision_verdict_precedence() -> None:
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("decision", "task"),
+            continuation.CompletionItem(
+                "validator", "validator-prerequisite", category="PyYAML"
+            ),
+        ),
+        blockers=(
+            continuation.Blocker(
+                "material-decision", "Choose retention policy", ("decision",)
+            ),
+        ),
+    )
+
+    result = continuation.drive_terminal(state)
+
+    assert result.verdict == "BLOCKED ON DECISION"
+    continuation.validate_completion_checklist(result.state)
+
+
+def test_unevidenced_item_preserves_decision_verdict_precedence() -> None:
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("decision", "task"),
+            continuation.CompletionItem("verify", "final-verification"),
+        ),
+        blockers=(
+            continuation.Blocker(
+                "material-decision", "Choose retention policy", ("decision",)
+            ),
+        ),
+    )
+
+    result = continuation.drive_terminal(state)
+
+    assert result.verdict == "BLOCKED ON DECISION"
+    continuation.validate_completion_checklist(result.state)
 
 
 def test_blocker_requires_explicit_affected_item_ids() -> None:

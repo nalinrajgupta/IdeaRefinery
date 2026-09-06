@@ -295,12 +295,23 @@ def validate_completion_checklist(state: ContinuationState) -> None:
             {"terminal_verdict": state.terminal_verdict},
         )
     _validate_terminal_verdict(state)
-    if state.terminal_verdict == "IMPLEMENTATION COMPLETE" and any(not item.completed for item in state.checklist):
-        raise StateError(
-            "incomplete-terminal-checklist",
-            "completion verdict requires every checklist item to be complete",
-        )
+    if state.terminal_verdict == "IMPLEMENTATION COMPLETE":
+        if pending_items:
+            raise StateError(
+                "incomplete-terminal-checklist",
+                "completion verdict requires every checklist item to be complete",
+            )
+        if state.blockers:
+            raise StateError(
+                "completion-verdict-blocker-mismatch",
+                "completion verdict cannot retain blocker records",
+            )
     if state.terminal_verdict in _BLOCKER_VERDICTS.values():
+        if not pending_items:
+            raise StateError(
+                "blocked-terminal-checklist-complete",
+                "blocked terminal verdict requires incomplete checklist items",
+            )
         _validate_blocked_terminal_state(state, pending_items)
 
 
@@ -782,7 +793,8 @@ def drive_terminal(
             tuple(item.item_id for item in state.checklist if not item.completed),
             derived=True,
         )
-        verdict = "BLOCKED ON VERIFICATION"
+        blockers = state.blockers + (blocker,)
+        verdict = _blocker_verdict(blockers)
         granted_paths = {
             item.item_id: f"authorization granted: protected-path:{item.category}"
             for item in protected_paths
@@ -791,7 +803,7 @@ def drive_terminal(
             replace(
                 state,
                 checklist=_applied_checklist(state.checklist, granted_paths),
-                blockers=state.blockers + (blocker,),
+                blockers=blockers,
                 requested_authorizations=state.requested_authorizations.union(validator_requests),
                 prerequisite_resolutions=_resolution_tuple(resolution_by_category),
                 terminal_verdict=verdict,
@@ -845,7 +857,8 @@ def drive_terminal(
             ),
             derived=True,
         )
-        verdict = _BLOCKER_VERDICTS[blocker.category]
+        blockers = state.blockers + (blocker,)
+        verdict = _blocker_verdict(blockers)
         applied_checklist = _applied_checklist(state.checklist, evidence_by_item)
         if first_unevidenced_key is not None:
             applied_checklist = _cleared_later_routine_evidence(
@@ -855,7 +868,7 @@ def drive_terminal(
             replace(
                 state,
                 checklist=applied_checklist,
-                blockers=state.blockers + (blocker,),
+                blockers=blockers,
                 prerequisite_resolutions=_resolution_tuple(resolution_by_category),
                 terminal_verdict=verdict,
             ),
