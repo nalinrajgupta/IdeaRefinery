@@ -91,6 +91,7 @@ def test_protected_path_is_requested_once_before_any_internal_mutation() -> None
             "missing-authority",
             "missing protected-path authorization for: "
             "tasks-output (protected-path:specs/004/tasks.md)",
+            ("tasks-output", "tasks"),
             derived=True,
         ),
     )
@@ -197,6 +198,7 @@ def test_missing_validator_is_an_external_blocker_with_one_remediation_request()
         continuation.Blocker(
             "external-state",
             "missing validator prerequisite for: validator (validator:PyYAML)",
+            ("validator", "verify"),
             derived=True,
         ),
     )
@@ -246,7 +248,7 @@ def test_true_blockers_are_terminal_and_do_not_run_internal_work(
     """Catches a blocker classification that silently promotes pending internal work."""
     state = continuation.ContinuationState(
         checklist=(continuation.CompletionItem("tasks", "task-promotion"),),
-        blockers=(continuation.Blocker(category, "recorded prerequisite"),),
+        blockers=(continuation.Blocker(category, "recorded prerequisite", ("tasks",)),),
     )
 
     result = continuation.drive_terminal(state)
@@ -324,7 +326,9 @@ def test_completion_checklist_rejects_blocked_verdict_blocker_mismatch() -> None
     """Catches a blocked terminal label disagreeing with blocker categories."""
     state = continuation.ContinuationState(
         checklist=(continuation.CompletionItem("state", "state-recording"),),
-        blockers=(continuation.Blocker("missing-authority", "state needs authority"),),
+        blockers=(
+            continuation.Blocker("missing-authority", "state needs authority", ("state",)),
+        ),
         terminal_verdict="BLOCKED ON VERIFICATION",
     )
 
@@ -335,8 +339,18 @@ def test_completion_checklist_rejects_blocked_verdict_blocker_mismatch() -> None
 def test_completion_checklist_rejects_pending_item_without_matching_blocker() -> None:
     """Catches blocked states that do not identify affected checklist items."""
     state = continuation.ContinuationState(
-        checklist=(continuation.CompletionItem("state", "state-recording"),),
-        blockers=(continuation.Blocker("external-state", "validator unavailable"),),
+        checklist=(
+            continuation.CompletionItem("state", "state-recording"),
+            continuation.CompletionItem(
+                "verify",
+                "final-verification",
+                completed=True,
+                evidence="full suite passed",
+            ),
+        ),
+        blockers=(
+            continuation.Blocker("external-state", "validator unavailable", ("verify",)),
+        ),
         terminal_verdict="BLOCKED ON VERIFICATION",
     )
 
@@ -395,7 +409,9 @@ def test_unknown_blocker_category_is_rejected() -> None:
     """Catches accidental expansion of the blocker taxonomy beyond authorized stops."""
     state = continuation.ContinuationState(
         checklist=(continuation.CompletionItem("tasks", "task-promotion"),),
-        blockers=(continuation.Blocker("routine-pause", "not a genuine blocker"),),
+        blockers=(
+            continuation.Blocker("routine-pause", "not a genuine blocker", ("tasks",)),
+        ),
     )
 
     with pytest.raises(ContractError, match="unknown blocker category"):
@@ -495,7 +511,11 @@ def test_recorded_blocker_is_not_re_evaluated_by_new_evidence() -> None:
     """Catches a user-recorded stop being cleared by routine action results."""
     state = continuation.ContinuationState(
         checklist=(continuation.CompletionItem("verify", "final-verification"),),
-        blockers=(continuation.Blocker("material-decision", "Choose retention policy"),),
+        blockers=(
+            continuation.Blocker(
+                "material-decision", "Choose retention policy", ("verify",)
+            ),
+        ),
     )
 
     result = continuation.drive_terminal(
@@ -505,6 +525,39 @@ def test_recorded_blocker_is_not_re_evaluated_by_new_evidence() -> None:
     assert result.verdict == "BLOCKED ON DECISION"
     assert result.state.blockers == state.blockers
     assert result.completed_item_ids == ()
+
+
+def test_recorded_blocker_does_not_stop_unaffected_actionable_work() -> None:
+    """Catches a scoped blocker halting unrelated actionable checklist items."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("decision", "task"),
+            continuation.CompletionItem("verify", "final-verification"),
+        ),
+        blockers=(
+            continuation.Blocker(
+                "material-decision", "Choose retention policy", ("decision",)
+            ),
+        ),
+    )
+
+    result = continuation.drive_terminal(
+        state, action_results={"verify": "full suite passed"}
+    )
+
+    assert result.verdict == "BLOCKED ON DECISION"
+    assert result.completed_item_ids == ("verify",)
+    assert result.state.checklist[1].completed is True
+
+
+def test_blocker_requires_explicit_affected_item_ids() -> None:
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("verify", "final-verification"),),
+        blockers=(continuation.Blocker("external-state", "validator unavailable", ()),),
+    )
+
+    with pytest.raises(ContractError, match="explicit affected checklist item ids"):
+        continuation.drive_terminal(state)
 
 
 def test_action_result_evidence_completes_a_previously_unevidenced_gate() -> None:

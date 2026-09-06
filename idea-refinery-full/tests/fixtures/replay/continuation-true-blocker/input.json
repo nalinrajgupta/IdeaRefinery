@@ -1,6 +1,10 @@
 {
   "blockers": [
-    {"category": "material-decision", "detail": "Choose retention policy"}
+    {
+      "category": "material-decision",
+      "detail": "Choose retention policy",
+      "affected_item_ids": ["tasks"]
+    }
   ],
   "checklist": [
     {"item_id": "tasks", "kind": "task-promotion"}

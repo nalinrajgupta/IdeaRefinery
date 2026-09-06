@@ -50,6 +50,7 @@ class Blocker:
 
     category: str
     detail: str
+    affected_item_ids: tuple[str, ...]
     derived: bool = False
     """True when the drive loop generated this blocker and must re-evaluate it on resume."""
 
@@ -170,16 +171,48 @@ def _validate_contract(state: ContinuationState) -> None:
             "blockers require category and detail",
             {"categories": invalid_blockers},
         )
-    unscoped_preflight = sorted(
+    invalid_blocker_items = [
+        blocker.category
+        for blocker in state.blockers
+        if not isinstance(blocker.affected_item_ids, tuple)
+        or not blocker.affected_item_ids
+        or any(
+            not isinstance(item_id, str) or not item_id.strip()
+            for item_id in blocker.affected_item_ids
+        )
+    ]
+    if invalid_blocker_items:
+        raise ContractError(
+            "blocker-affected-items-invalid",
+            "blockers require explicit affected checklist item ids",
+            {"categories": invalid_blocker_items},
+        )
+    checklist_item_ids = {item.item_id for item in state.checklist}
+    unknown_blocker_items = sorted(
+        {
+            item_id
+            for blocker in state.blockers
+            for item_id in blocker.affected_item_ids
+            if item_id not in checklist_item_ids
+        }
+    )
+    if unknown_blocker_items:
+        raise ContractError(
+            "blocker-affected-item-unknown",
+            "blocker affected item ids must reference checklist items",
+            {"item_ids": unknown_blocker_items},
+        )
+    invalid_preflight_categories = sorted(
         item.item_id
         for item in state.checklist
-        if item.kind in {"protected-path-authorization", "validator-prerequisite"} and not item.category
+        if item.kind in {"protected-path-authorization", "validator-prerequisite"}
+        and (not isinstance(item.category, str) or not item.category.strip())
     )
-    if unscoped_preflight:
+    if invalid_preflight_categories:
         raise ContractError(
             "completion-category-missing",
-            "completion category is required for preflight gates",
-            {"item_ids": unscoped_preflight},
+            "completion category must be a non-empty string for preflight gates",
+            {"item_ids": invalid_preflight_categories},
         )
     unknown_blockers = sorted({blocker.category for blocker in state.blockers} - set(_BLOCKER_VERDICTS))
     if unknown_blockers:
@@ -241,6 +274,7 @@ def validate_completion_checklist(state: ContinuationState) -> None:
         for item in state.checklist
         if not item.completed and item.kind in _INTERNAL_ORDER and _INTERNAL_ORDER[item.kind] >= 0
     ]
+    pending_items = [item for item in state.checklist if not item.completed]
     pending_internal = [item.item_id for item in pending_internal_items]
     is_terminal = state.terminal_verdict in _TERMINAL_VERDICTS
     if not is_terminal and pending_internal:
@@ -262,7 +296,7 @@ def validate_completion_checklist(state: ContinuationState) -> None:
             "completion verdict requires every checklist item to be complete",
         )
     if state.terminal_verdict in _BLOCKER_VERDICTS.values():
-        _validate_blocked_terminal_state(state, pending_internal_items)
+        _validate_blocked_terminal_state(state, pending_items)
 
 
 def _validate_terminal_verdict(state: ContinuationState) -> None:
@@ -297,11 +331,13 @@ def _validate_blocked_terminal_state(
             "blocked terminal verdict must match blocker categories",
             {"terminal_verdict": state.terminal_verdict, "blocker_verdict": expected_verdict},
         )
-    blocker_text = "\n".join(blocker.detail for blocker in state.blockers)
+    blocked_item_ids = {
+        item_id for blocker in state.blockers for item_id in blocker.affected_item_ids
+    }
     uncovered_items = [
         item.item_id
         for item in pending_items
-        if item.item_id not in blocker_text and (not item.category or item.category not in blocker_text)
+        if item.item_id not in blocked_item_ids
     ]
     if uncovered_items:
         raise StateError(
@@ -484,7 +520,23 @@ def continuation_state_from_document(document: dict[str, Any]) -> ContinuationSt
                 "blocker derived flag must be a boolean",
                 {"item_index": item_index},
             )
-        blockers.append(Blocker(category, detail, derived))
+        affected_item_ids = item.get("affected_item_ids")
+        if not isinstance(affected_item_ids, list) or not affected_item_ids:
+            raise ContractError(
+                "blocker-affected-items-invalid",
+                "blocker affected_item_ids must be a non-empty list",
+                {"item_index": item_index},
+            )
+        affected_item_ids = tuple(
+            _require_nonempty_string(
+                item_id,
+                code="blocker-affected-items-invalid",
+                field="affected_item_ids",
+                item_index=item_index,
+            )
+            for item_id in affected_item_ids
+        )
+        blockers.append(Blocker(category, detail, affected_item_ids, derived))
     raw_resolutions = document.get("prerequisite_resolutions", [])
     if not isinstance(raw_resolutions, list):
         raise ContractError(
@@ -622,16 +674,17 @@ def drive_terminal(
     granted = frozenset(granted_authorizations)
     validators = frozenset(available_validators)
     recorded_blockers = tuple(blocker for blocker in state.blockers if not blocker.derived)
-    if recorded_blockers:
-        verdict = _blocker_verdict(recorded_blockers)
-        next_state = replace(state, terminal_verdict=verdict)
-        return ContinuationResult(next_state, verdict, ())
     state = replace(state, blockers=recorded_blockers)
+    blocked_item_ids = {
+        item_id for blocker in recorded_blockers for item_id in blocker.affected_item_ids
+    }
     protected_paths = sorted(
         (
             item
             for item in state.checklist
-            if not item.completed and item.kind == "protected-path-authorization"
+            if not item.completed
+            and item.item_id not in blocked_item_ids
+            and item.kind == "protected-path-authorization"
         ),
         key=lambda item: (item.category or "", item.item_id),
     )
@@ -652,6 +705,7 @@ def drive_terminal(
             + ", ".join(
                 f"{item.item_id} (protected-path:{item.category})" for item in missing_paths
             ),
+            tuple(item.item_id for item in state.checklist if not item.completed),
             derived=True,
         )
         verdict = "BLOCKED ON DECISION"
@@ -672,7 +726,9 @@ def drive_terminal(
     validator_items = tuple(
         item
         for item in state.checklist
-        if not item.completed and item.kind == "validator-prerequisite"
+        if not item.completed
+        and item.item_id not in blocked_item_ids
+        and item.kind == "validator-prerequisite"
     )
     for item in validator_items:
         if item.category in validators:
@@ -709,6 +765,7 @@ def drive_terminal(
             "external-state",
             "missing validator prerequisite for: "
             + ", ".join(f"{item.item_id} (validator:{item.category})" for item in missing_validators),
+            tuple(item.item_id for item in state.checklist if not item.completed),
             derived=True,
         )
         verdict = "BLOCKED ON VERIFICATION"
@@ -730,7 +787,11 @@ def drive_terminal(
             validator_requests,
         )
     pending = sorted(
-        (item for item in state.checklist if not item.completed),
+        (
+            item
+            for item in state.checklist
+            if not item.completed and item.item_id not in blocked_item_ids
+        ),
         key=_completion_sort_key,
     )
     if pending:
@@ -743,6 +804,7 @@ def drive_terminal(
                 (item for item in state.checklist if not item.completed),
                 key=_completion_sort_key,
             )
+            pending = [item for item in pending if item.item_id not in blocked_item_ids]
     evidence_by_item: dict[str, str] = {}
     unevidenced: list[str] = []
     first_unevidenced_key: tuple[int, str] | None = None
@@ -758,6 +820,15 @@ def drive_terminal(
         blocker = Blocker(
             "external-state",
             "no recorded transition evidence for: " + ", ".join(unevidenced),
+            tuple(
+                item.item_id
+                for item in state.checklist
+                if not item.completed
+                and (
+                    item.item_id in blocked_item_ids
+                    or _completion_sort_key(item) >= first_unevidenced_key
+                )
+            ),
             derived=True,
         )
         verdict = _BLOCKER_VERDICTS[blocker.category]
@@ -778,6 +849,16 @@ def drive_terminal(
             (),
         )
     completed_item_ids = tuple(item.item_id for item in pending)
+    if recorded_blockers:
+        verdict = _blocker_verdict(recorded_blockers)
+        next_state = replace(
+            state,
+            checklist=_applied_checklist(state.checklist, evidence_by_item),
+            prerequisite_resolutions=_resolution_tuple(resolution_by_category),
+            terminal_verdict=verdict,
+        )
+        validate_completion_checklist(next_state)
+        return ContinuationResult(next_state, verdict, completed_item_ids)
     next_state = replace(
         state,
         checklist=_applied_checklist(state.checklist, evidence_by_item),

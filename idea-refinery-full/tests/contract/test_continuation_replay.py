@@ -142,6 +142,7 @@ def test_replay_document_preserves_derived_blockers() -> None:
             {
                 "category": "external-state",
                 "detail": "no recorded transition evidence for: verify",
+                "affected_item_ids": ["verify"],
                 "derived": True,
             }
         ],
@@ -157,7 +158,14 @@ def test_replay_document_preserves_derived_blockers() -> None:
 def test_replay_document_rejects_non_boolean_derived_blocker_flag() -> None:
     """Catches a truthy non-boolean flag turning a recorded stop into a re-evaluable one."""
     document = {
-        "blockers": [{"category": "external-state", "detail": "recorded", "derived": "true"}]
+        "blockers": [
+            {
+                "category": "external-state",
+                "detail": "recorded",
+                "affected_item_ids": ["verify"],
+                "derived": "true",
+            }
+        ],
     }
 
     with pytest.raises(ContractError) as caught:
@@ -171,9 +179,24 @@ def test_replay_document_rejects_non_boolean_derived_blocker_flag() -> None:
     [
         ("bad", "blockers-invalid"),
         ([{}], "blocker-category-invalid"),
-        ([{"category": "", "detail": "missing authority"}], "blocker-category-invalid"),
-        ([{"category": "missing-authority", "detail": ""}], "blocker-detail-invalid"),
-        ([{"category": "routine-pause", "detail": "not a real blocker"}], "unknown-blocker-category"),
+        (
+            [{"category": "", "detail": "missing authority", "affected_item_ids": ["task"]}],
+            "blocker-category-invalid",
+        ),
+        (
+            [{"category": "missing-authority", "detail": "", "affected_item_ids": ["task"]}],
+            "blocker-detail-invalid",
+        ),
+        (
+            [
+                {
+                    "category": "routine-pause",
+                    "detail": "not a real blocker",
+                    "affected_item_ids": ["task"],
+                }
+            ],
+            "unknown-blocker-category",
+        ),
     ],
 )
 def test_replay_document_rejects_malformed_or_unsupported_blockers(
