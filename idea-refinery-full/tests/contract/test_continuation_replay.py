@@ -218,3 +218,43 @@ def test_replay_document_rejects_malformed_or_unsupported_blockers(
         continuation.continuation_state_from_document({"blockers": blockers})
 
     assert caught.value.code == code
+
+
+@pytest.mark.parametrize("dependencies", [None, "task", {}, [7], [""]])
+def test_replay_document_rejects_malformed_dependencies(dependencies: object) -> None:
+    document = {
+        "checklist": [
+            {"item_id": "verify", "kind": "final-verification", "dependencies": dependencies},
+        ]
+    }
+
+    with pytest.raises(ContractError) as caught:
+        continuation.continuation_state_from_document(document)
+
+    assert caught.value.code == "completion-dependencies-invalid"
+
+
+@pytest.mark.parametrize(
+    ("dependencies", "code"),
+    [(["missing"], "completion-dependency-unknown"), (["verify"], "completion-dependency-cycle")],
+)
+def test_replay_cannot_complete_with_invalid_dependency_graph(
+    dependencies: list[str], code: str,
+) -> None:
+    state = continuation.continuation_state_from_document(
+        {
+            "checklist": [
+                {
+                    "item_id": "verify",
+                    "kind": "final-verification",
+                    "evidence": "suite passed",
+                    "dependencies": dependencies,
+                },
+            ]
+        }
+    )
+
+    with pytest.raises(ContractError) as caught:
+        continuation.drive_terminal(state)
+
+    assert caught.value.code == code

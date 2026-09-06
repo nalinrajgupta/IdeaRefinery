@@ -42,6 +42,7 @@ class CompletionItem:
     completed: bool = False
     category: str | None = None
     evidence: str | None = None
+    dependencies: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -155,6 +156,24 @@ def _validate_contract(state: ContinuationState) -> None:
     unknown_kinds = sorted({item.kind for item in state.checklist} - set(_INTERNAL_ORDER))
     if unknown_kinds:
         raise ContractError("unknown-completion-kind", "unknown completion checklist kind", {"kinds": unknown_kinds})
+    for item in state.checklist:
+        if not isinstance(item.dependencies, tuple) or any(
+            not isinstance(dependency, str) or not dependency.strip()
+            for dependency in item.dependencies
+        ):
+            raise ContractError(
+                "completion-dependencies-invalid",
+                "completion dependencies must be a tuple of non-empty item ids",
+                {"item_id": item.item_id},
+            )
+        unknown_dependencies = set(item.dependencies) - seen_item_ids
+        if unknown_dependencies:
+            raise ContractError(
+                "completion-dependency-unknown",
+                "completion dependencies must reference checklist items",
+                {"item_id": item.item_id, "dependencies": sorted(unknown_dependencies)},
+            )
+    _ordered_checklist(state.checklist)
     invalid_blockers = sorted(
         str(blocker.category)
         for blocker in state.blockers
@@ -316,6 +335,11 @@ def validate_completion_checklist(state: ContinuationState) -> None:
         )
     _validate_terminal_verdict(state)
     if state.terminal_verdict == "IMPLEMENTATION COMPLETE":
+        if not any(item.kind == "final-verification" for item in state.checklist):
+            raise ContractError(
+                "completion-required-kind-missing",
+                "completion checklist requires a final-verification gate",
+            )
         if pending_items:
             raise StateError(
                 "incomplete-terminal-checklist",
@@ -387,29 +411,45 @@ def _completion_sort_key(item: CompletionItem) -> tuple[int, str]:
     return (_INTERNAL_ORDER[item.kind], item.item_id)
 
 
-def _cleared_later_routine_evidence(
-    checklist: tuple[CompletionItem, ...], earliest_pending_rank: int
-) -> tuple[CompletionItem, ...]:
-    """Invalidate gates whose evidence would be stale after an earlier pending gate."""
-    return tuple(
-        replace(item, completed=False, evidence=None)
-        if _INTERNAL_ORDER[item.kind] >= 0
-        and _INTERNAL_ORDER[item.kind] > earliest_pending_rank
-        and (item.completed or item.evidence)
-        else item
-        for item in checklist
-    )
+def _ordered_checklist(checklist: tuple[CompletionItem, ...]) -> tuple[CompletionItem, ...]:
+    """Order dependencies first, breaking ties by workflow kind and item id."""
+    remaining = sorted(checklist, key=_completion_sort_key)
+    ordered: list[CompletionItem] = []
+    visited: set[str] = set()
+    while remaining:
+        item = next((item for item in remaining if set(item.dependencies) <= visited), None)
+        if item is None:
+            raise ContractError(
+                "completion-dependency-cycle",
+                "completion dependencies must not contain cycles",
+            )
+        remaining.remove(item)
+        ordered.append(item)
+        visited.add(item.item_id)
+    return tuple(ordered)
 
 
-def _cleared_later_completed_gates(
-    checklist: tuple[CompletionItem, ...], earliest_pending_rank: int
+def _dependent_item_ids(
+    checklist: tuple[CompletionItem, ...], item_ids: Collection[str]
+) -> set[str]:
+    """Find only transitive dependents, including dependents of the same kind."""
+    affected = set(item_ids)
+    dependents: set[str] = set()
+    for item in _ordered_checklist(checklist):
+        if affected.intersection(item.dependencies):
+            affected.add(item.item_id)
+            dependents.add(item.item_id)
+    return dependents
+
+
+def _cleared_dependent_evidence(
+    checklist: tuple[CompletionItem, ...], pending_item_ids: Collection[str]
 ) -> tuple[CompletionItem, ...]:
-    """Invalidate completed later gates before advancing an earlier pending gate."""
+    """Invalidate evidence only for gates depending on pending work."""
+    dependent_ids = _dependent_item_ids(checklist, pending_item_ids)
     return tuple(
         replace(item, completed=False, evidence=None)
-        if _INTERNAL_ORDER[item.kind] >= 0
-        and _INTERNAL_ORDER[item.kind] > earliest_pending_rank
-        and item.completed
+        if item.item_id in dependent_ids and (item.completed or item.evidence)
         else item
         for item in checklist
     )
@@ -523,7 +563,23 @@ def continuation_state_from_document(document: dict[str, Any]) -> ContinuationSt
                 field="evidence",
                 item_index=item_index,
             )
-        checklist_items.append(CompletionItem(item_id, kind, completed, category, evidence))
+        dependencies = item.get("dependencies", [])
+        if not isinstance(dependencies, list):
+            raise ContractError(
+                "completion-dependencies-invalid",
+                "completion dependencies must be a list of non-empty item ids",
+                {"item_index": item_index},
+            )
+        dependencies = tuple(
+            _require_nonempty_string(
+                dependency,
+                code="completion-dependencies-invalid",
+                field="dependencies",
+                item_index=item_index,
+            )
+            for dependency in dependencies
+        )
+        checklist_items.append(CompletionItem(item_id, kind, completed, category, evidence, dependencies))
     checklist = tuple(checklist_items)
     raw_blockers = document.get("blockers", [])
     if not isinstance(raw_blockers, list):
@@ -701,6 +757,19 @@ def _applied_checklist(
     )
 
 
+def _ready_preflight_evidence(
+    checklist: tuple[CompletionItem, ...], evidence_by_item: Mapping[str, str]
+) -> dict[str, str]:
+    """Accept preflight evidence only after every declared dependency is complete."""
+    completed = {item.item_id for item in checklist if item.completed}
+    ready: dict[str, str] = {}
+    for item in _ordered_checklist(checklist):
+        if item.item_id in evidence_by_item and set(item.dependencies) <= completed:
+            ready[item.item_id] = evidence_by_item[item.item_id]
+            completed.add(item.item_id)
+    return ready
+
+
 def drive_terminal(
     state: ContinuationState,
     *,
@@ -716,8 +785,27 @@ def drive_terminal(
     results = _validated_action_results(action_results)
     granted = frozenset(granted_authorizations)
     validators = frozenset(available_validators)
-    recorded_blockers = tuple(blocker for blocker in state.blockers if not blocker.derived)
-    state = replace(state, blockers=recorded_blockers)
+    recorded_blockers = tuple(
+        blocker for blocker in state.blockers
+        if not blocker.derived or blocker.category == "material-decision"
+    )
+    recorded_blockers = tuple(
+        replace(
+            blocker,
+            affected_item_ids=tuple(dict.fromkeys((
+                *blocker.affected_item_ids,
+                *sorted(_dependent_item_ids(state.checklist, blocker.affected_item_ids)),
+            ))),
+        )
+        for blocker in recorded_blockers
+    )
+    state = replace(
+        state,
+        blockers=recorded_blockers,
+        checklist=_cleared_dependent_evidence(
+            state.checklist, [item.item_id for item in state.checklist if not item.completed]
+        ),
+    )
     blocked_item_ids = {
         item_id for blocker in recorded_blockers for item_id in blocker.affected_item_ids
     }
@@ -747,6 +835,7 @@ def drive_terminal(
             for item in protected_paths
             if item not in missing_paths
         }
+        granted_paths = _ready_preflight_evidence(state.checklist, granted_paths)
         applied_checklist = _applied_checklist(state.checklist, granted_paths)
         blocker = Blocker(
             "missing-authority",
@@ -767,7 +856,7 @@ def drive_terminal(
                 terminal_verdict=verdict,
             ),
             verdict,
-            (),
+            tuple(granted_paths),
             authorization_requests,
         )
     resolution_by_category = {
@@ -819,6 +908,7 @@ def drive_terminal(
             for item in (*protected_paths, *validator_items)
             if (evidence := _transition_evidence(item, {}, resolution_by_category, granted))
         }
+        preflight_evidence = _ready_preflight_evidence(state.checklist, preflight_evidence)
         applied_checklist = _applied_checklist(state.checklist, preflight_evidence)
         blocker = Blocker(
             "external-state",
@@ -839,61 +929,37 @@ def drive_terminal(
                 terminal_verdict=verdict,
             ),
             verdict,
-            (),
+            tuple(preflight_evidence),
             validator_requests,
         )
-    pending = sorted(
-        (
-            item
-            for item in state.checklist
-            if not item.completed and item.item_id not in blocked_item_ids
-        ),
-        key=_completion_sort_key,
-    )
-    if pending:
-        cleared_checklist = _cleared_later_completed_gates(
-            state.checklist, _INTERNAL_ORDER[pending[0].kind]
-        )
-        if cleared_checklist != state.checklist:
-            state = replace(state, checklist=cleared_checklist)
-            pending = sorted(
-                (item for item in state.checklist if not item.completed),
-                key=_completion_sort_key,
-            )
-            pending = [item for item in pending if item.item_id not in blocked_item_ids]
+    pending = [
+        item for item in _ordered_checklist(state.checklist)
+        if not item.completed and item.item_id not in blocked_item_ids
+    ]
     evidence_by_item: dict[str, str] = {}
     unevidenced: list[str] = []
-    first_unevidenced_key: tuple[int, str] | None = None
     for item in pending:
         evidence = _transition_evidence(item, results, resolution_by_category, granted)
         if evidence:
             evidence_by_item[item.item_id] = evidence
         else:
             unevidenced.append(item.item_id)
-            first_unevidenced_key = _completion_sort_key(item)
             break
     if unevidenced:
+        applied_checklist = _applied_checklist(state.checklist, evidence_by_item)
+        applied_checklist = _cleared_dependent_evidence(applied_checklist, unevidenced)
         blocker = Blocker(
             "external-state",
             "no recorded transition evidence for: " + ", ".join(unevidenced),
             tuple(
                 item.item_id
-                for item in state.checklist
+                for item in applied_checklist
                 if not item.completed
-                and (
-                    item.item_id in blocked_item_ids
-                    or _completion_sort_key(item) >= first_unevidenced_key
-                )
             ),
             derived=True,
         )
         blockers = state.blockers + (blocker,)
         verdict = _blocker_verdict(blockers)
-        applied_checklist = _applied_checklist(state.checklist, evidence_by_item)
-        if first_unevidenced_key is not None:
-            applied_checklist = _cleared_later_routine_evidence(
-                applied_checklist, first_unevidenced_key[0]
-            )
         return ContinuationResult(
             replace(
                 state,
@@ -903,7 +969,7 @@ def drive_terminal(
                 terminal_verdict=verdict,
             ),
             verdict,
-            (),
+            tuple(evidence_by_item),
         )
     completed_item_ids = tuple(item.item_id for item in pending)
     if recorded_blockers:

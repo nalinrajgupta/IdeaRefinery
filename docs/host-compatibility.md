@@ -54,6 +54,8 @@ Before any mutable implementation work, every host performs the same preflight: 
 
 Only `missing-authority`, `material-decision`, and `external-state` can produce a blocked implementation verdict. Routine recovery—such as a write-set conflict, stale evidence, an invalid reviewer envelope, or an objective review correction—continues in the controller loop. The deterministic continuation validator is provider- and credential-independent; it validates replayable workflow state and does not invoke model providers, require their credentials, or run a background scheduler.
 
+Continuation replay checklist items record their prerequisite item IDs in `dependencies` (a JSON list; omitted means no dependencies). References must exist and be acyclic. The sidecar advances dependencies first and invalidates only transitive dependent evidence, preserving independent slices. Record all applicable dependencies, including those of final verification; an `IMPLEMENTATION COMPLETE` verdict requires a `final-verification` gate. Material-decision blockers remain binding even if marked `derived`, and blocked results report any item IDs completed during that drive.
+
 The controller is the sole writer of `tasks.md`, `refinery-state.md`, and `implementation-state.md` on every host. Generated `.agents/skills/idea-refinery-*` folders are distributions, not alternate sources: edit canonical `idea-refinery-*` folders and run the synchronization command below.
 
 ## Update, remove, and validate
