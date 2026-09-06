@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -124,6 +125,16 @@ def test_replay_document_rejects_non_string_terminal_verdict() -> None:
     """Catches a falsey non-string verdict bypassing terminal-state validation."""
     with pytest.raises(ContractError, match="terminal verdict must be a string"):
         continuation.continuation_state_from_document({"terminal_verdict": []})
+
+
+@pytest.mark.parametrize("document", [[], ["checklist"], None, True, 7, "checklist"])
+def test_replay_rejects_non_object_document_roots(document: object, tmp_path: Path) -> None:
+    (tmp_path / "input.json").write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ContractError) as caught:
+        continuation.replay_continuation_fixture(tmp_path)
+
+    assert caught.value.code == "continuation-document-invalid"
 
 
 def test_replay_document_without_a_checklist_cannot_reach_a_terminal_drive() -> None:

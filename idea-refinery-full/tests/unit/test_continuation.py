@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import asdict
+
 import pytest
 
 from idea_refinery import continuation
@@ -267,6 +269,162 @@ def test_equivalent_validation_evidence_completes_validator_prerequisite() -> No
     assert result.verdict == "IMPLEMENTATION COMPLETE"
     assert result.completed_item_ids == ("validator", "verify")
     assert result.state.prerequisite_resolutions == state.prerequisite_resolutions
+
+
+@pytest.mark.parametrize("outcome", ["exact-validator", "equivalent-evidence"])
+def test_partial_validator_resolutions_persist_before_another_validator_blocks(
+    outcome: str,
+) -> None:
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "available", "validator-prerequisite", category="available"
+            ),
+            continuation.CompletionItem(
+                "missing", "validator-prerequisite", category="missing"
+            ),
+        ),
+        prerequisite_resolutions=(
+            (continuation.PrerequisiteResolution("available", outcome, "schema validated"),)
+            if outcome == "equivalent-evidence"
+            else ()
+        ),
+    )
+
+    blocked = continuation.drive_terminal(
+        state, available_validators={"available"} if outcome == "exact-validator" else ()
+    )
+
+    assert blocked.state.checklist[0].completed is True
+    assert blocked.state.checklist[0].evidence.startswith(f"{outcome}: ")
+    assert blocked.state.blockers[-1].affected_item_ids == ("missing",)
+    continuation.validate_completion_checklist(blocked.state)
+    resumed = continuation.drive_terminal(blocked.state, available_validators={"missing"})
+    assert resumed.verdict == "IMPLEMENTATION COMPLETE"
+    assert resumed.completed_item_ids == ("missing",)
+
+
+@pytest.mark.parametrize(
+    ("kind", "evidence", "resolutions"),
+    [
+        ("protected-path-authorization", "denied", ()),
+        (
+            "protected-path-authorization",
+            "authorization granted: protected-path:other",
+            (),
+        ),
+        ("validator-prerequisite", "validated", ()),
+        (
+            "validator-prerequisite",
+            "unavailable: not installed",
+            (continuation.PrerequisiteResolution("scope", "unavailable", "not installed"),),
+        ),
+        (
+            "validator-prerequisite",
+            "exact-validator: validated",
+            (continuation.PrerequisiteResolution("other", "exact-validator", "validated"),),
+        ),
+        (
+            "validator-prerequisite",
+            "denied",
+            (continuation.PrerequisiteResolution("scope", "exact-validator", "validated"),),
+        ),
+    ],
+)
+@pytest.mark.parametrize("persisted_verdict", [None, "IMPLEMENTATION COMPLETE"])
+@pytest.mark.parametrize("replay", [False, True])
+def test_completed_preflight_requires_scoped_acceptance_evidence(
+    kind: str,
+    evidence: str,
+    resolutions: tuple[continuation.PrerequisiteResolution, ...],
+    persisted_verdict: str | None,
+    replay: bool,
+) -> None:
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "preflight", kind, completed=True, category="scope", evidence=evidence
+            ),
+        ),
+        prerequisite_resolutions=resolutions,
+        terminal_verdict=persisted_verdict,
+    )
+    if replay:
+        state = continuation.continuation_state_from_document(
+            {
+                "checklist": [asdict(item) for item in state.checklist],
+                "prerequisite_resolutions": [asdict(resolution) for resolution in resolutions],
+                "terminal_verdict": persisted_verdict,
+            }
+        )
+
+    for validate in (
+        continuation.validate_completion_checklist,
+        continuation.drive_terminal,
+    ):
+        with pytest.raises(ContractError, match="completed preflight"):
+            validate(state)
+
+
+@pytest.mark.parametrize("outcome", ["exact-validator", "equivalent-evidence"])
+def test_completed_preflight_evidence_survives_replay_without_new_grants(outcome: str) -> None:
+    state = continuation.continuation_state_from_document(
+        {
+            "checklist": [
+                {
+                    "item_id": "path",
+                    "kind": "protected-path-authorization",
+                    "category": "scope",
+                    "completed": True,
+                    "evidence": "authorization granted: protected-path:scope",
+                },
+                {
+                    "item_id": "validator",
+                    "kind": "validator-prerequisite",
+                    "category": "scope",
+                    "completed": True,
+                    "evidence": f"{outcome}: schema validated",
+                },
+            ],
+            "prerequisite_resolutions": [
+                {"category": "scope", "outcome": outcome, "evidence": "schema validated"}
+            ],
+            "terminal_verdict": "IMPLEMENTATION COMPLETE",
+        }
+    )
+
+    result = continuation.drive_terminal(state)
+
+    assert result.verdict == "IMPLEMENTATION COMPLETE"
+    assert result.completed_item_ids == ()
+    assert result.state == state
+
+
+def test_shared_validator_category_preserves_accepted_resolution() -> None:
+    resolution = continuation.PrerequisiteResolution(
+        "schema", "equivalent-evidence", "schema validated"
+    )
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "accepted",
+                "validator-prerequisite",
+                completed=True,
+                category="schema",
+                evidence="equivalent-evidence: schema validated",
+            ),
+            continuation.CompletionItem(
+                "pending", "validator-prerequisite", category="schema"
+            ),
+        ),
+        prerequisite_resolutions=(resolution,),
+    )
+
+    result = continuation.drive_terminal(state, available_validators={"schema"})
+
+    assert result.verdict == "IMPLEMENTATION COMPLETE"
+    assert result.state.prerequisite_resolutions == (resolution,)
+    continuation.validate_completion_checklist(result.state)
 
 
 @pytest.mark.parametrize(
@@ -587,6 +745,42 @@ def test_earlier_gate_invalidates_completed_later_gates_until_fresh_evidence() -
     assert verify_item.evidence is None
 
 
+@pytest.mark.parametrize("completed_id", ["a", "z"])
+@pytest.mark.parametrize("action_results", [None, {"pending": "task accepted"}])
+def test_pending_task_preserves_independent_completed_task_evidence(
+    completed_id: str, action_results: dict[str, str] | None,
+) -> None:
+    completed = continuation.CompletionItem(
+        completed_id, "task", completed=True, evidence="independent task accepted"
+    )
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("pending", "task"), completed)
+    )
+
+    result = continuation.drive_terminal(state, action_results=action_results)
+
+    assert result.state.checklist[1] == completed
+    assert result.verdict == (
+        "IMPLEMENTATION COMPLETE" if action_results else "BLOCKED ON VERIFICATION"
+    )
+    continuation.validate_completion_checklist(result.state)
+
+
+def test_missing_task_evidence_preserves_same_kind_pending_evidence() -> None:
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("a", "task"),
+            continuation.CompletionItem("b", "task", evidence="independent task accepted"),
+        )
+    )
+
+    blocked = continuation.drive_terminal(state)
+    resumed = continuation.drive_terminal(blocked.state, action_results={"a": "task accepted"})
+
+    assert blocked.state.checklist[1].evidence == "independent task accepted"
+    assert resumed.verdict == "IMPLEMENTATION COMPLETE"
+
+
 def test_recorded_blocker_is_not_re_evaluated_by_new_evidence() -> None:
     """Catches a user-recorded stop being cleared by routine action results."""
     state = continuation.ContinuationState(
@@ -734,6 +928,29 @@ def test_direct_state_rejects_non_string_completion_kind() -> None:
 
     with pytest.raises(ContractError, match="kind must be a non-empty string"):
         continuation.validate_completion_checklist(state)
+
+
+@pytest.mark.parametrize("verdict", [[], {}, 0, False])
+@pytest.mark.parametrize("completed", [True, False])
+def test_direct_state_rejects_non_string_terminal_verdict(
+    verdict: object, completed: bool,
+) -> None:
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "verify", "final-verification", completed=completed, evidence="suite passed"
+            ),
+        ),
+        terminal_verdict=verdict,
+    )
+
+    for validate in (
+        continuation.validate_completion_checklist,
+        continuation.drive_terminal,
+    ):
+        with pytest.raises(ContractError) as caught:
+            validate(state)
+        assert caught.value.code == "unknown-terminal-verdict"
 
 
 def test_direct_state_rejects_non_string_prerequisite_outcome() -> None:

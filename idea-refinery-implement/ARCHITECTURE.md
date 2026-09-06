@@ -21,7 +21,7 @@ Ready Idea Refinery handoff
   -> controller evidence and path inspection
   -> independent read-only wave review
   -> automatic objective finding correction, task promotion, integrated verification
-  -> Spec Kit convergence (0..2 implementation cycles)
+  -> Spec Kit convergence (0..2 initially authorized implementation cycles)
   -> after hooks and fresh final verification
   -> terminal-verdict drive loop: advance or explicitly block every item
   -> optional gstack pre-landing review
@@ -150,7 +150,7 @@ Every material finding has evidence, severity, affected requirement/task, impact
 
 After the original task list completes, the controller snapshots `tasks.md` and invokes `$speckit-converge` under its own identity. The only permitted mutation is one validated append-only Convergence section. The controller records the exact patch and hashes; any other change is rejected.
 
-Appended tasks use the same scheduler, TDD, review, correction, and promotion gates without another user prompt. There are at most two convergence implementation cycles. A repeated root cause or new high-severity contradiction is investigated and repaired when objective and in scope; the loop stops only for a material decision or external-state verification failure.
+Appended tasks use the same scheduler, TDD, review, correction, and promotion gates without another user prompt. The initial authorization permits at most two convergence implementation cycles. Remaining gaps after that budget require a `missing-authority` blocker and `BLOCKED ON DECISION` pending a bounded extension; the controller persists one scoped request, any approved limit, and the consumed cycle count across resumes. Within the authorized budget, a repeated root cause or new high-severity contradiction is investigated and repaired when objective and in scope; the loop stops only for a material decision or external-state verification failure.
 
 ## Completion
 

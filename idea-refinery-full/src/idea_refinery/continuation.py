@@ -264,11 +264,31 @@ def _validate_contract(state: ContinuationState) -> None:
             "prerequisite resolution categories must be unique",
             {"categories": sorted(duplicate_resolution_categories)},
         )
+    resolutions = {
+        resolution.category: resolution for resolution in state.prerequisite_resolutions
+    }
+    for item in state.checklist:
+        if not item.completed:
+            continue
+        if item.kind == "protected-path-authorization":
+            expected_evidence = f"authorization granted: protected-path:{item.category}"
+        elif item.kind == "validator-prerequisite":
+            expected_evidence = _transition_evidence(item, {}, resolutions, frozenset())
+        else:
+            continue
+        if item.evidence != expected_evidence:
+            raise ContractError(
+                "completion-preflight-evidence-invalid",
+                "completed preflight gates require matching scoped acceptance evidence",
+                {"item_id": item.item_id},
+            )
 
 
 def validate_completion_checklist(state: ContinuationState) -> None:
     """Reject unsupported blockers and unsafe non-terminal pauses."""
     _validate_contract(state)
+    if not isinstance(state.terminal_verdict, str):
+        _validate_terminal_verdict(state)
     pending_internal_items = [
         item
         for item in state.checklist
@@ -368,13 +388,13 @@ def _completion_sort_key(item: CompletionItem) -> tuple[int, str]:
 
 
 def _cleared_later_routine_evidence(
-    checklist: tuple[CompletionItem, ...], earliest_pending_key: tuple[int, str]
+    checklist: tuple[CompletionItem, ...], earliest_pending_rank: int
 ) -> tuple[CompletionItem, ...]:
     """Invalidate gates whose evidence would be stale after an earlier pending gate."""
     return tuple(
         replace(item, completed=False, evidence=None)
         if _INTERNAL_ORDER[item.kind] >= 0
-        and _completion_sort_key(item) > earliest_pending_key
+        and _INTERNAL_ORDER[item.kind] > earliest_pending_rank
         and (item.completed or item.evidence)
         else item
         for item in checklist
@@ -382,13 +402,13 @@ def _cleared_later_routine_evidence(
 
 
 def _cleared_later_completed_gates(
-    checklist: tuple[CompletionItem, ...], earliest_pending_key: tuple[int, str]
+    checklist: tuple[CompletionItem, ...], earliest_pending_rank: int
 ) -> tuple[CompletionItem, ...]:
     """Invalidate completed later gates before advancing an earlier pending gate."""
     return tuple(
         replace(item, completed=False, evidence=None)
         if _INTERNAL_ORDER[item.kind] >= 0
-        and _completion_sort_key(item) > earliest_pending_key
+        and _INTERNAL_ORDER[item.kind] > earliest_pending_rank
         and item.completed
         else item
         for item in checklist
@@ -445,6 +465,11 @@ def _require_nonempty_string(value: Any, *, code: str, field: str, item_index: i
 
 def continuation_state_from_document(document: dict[str, Any]) -> ContinuationState:
     """Load a provider-independent continuation state from a replay document."""
+    if not isinstance(document, dict):
+        raise ContractError(
+            "continuation-document-invalid",
+            "continuation document must be an object",
+        )
     raw_checklist = document.get("checklist", [])
     if not isinstance(raw_checklist, list):
         raise ContractError("checklist-invalid", "checklist must be a list")
@@ -756,7 +781,10 @@ def drive_terminal(
         and item.kind == "validator-prerequisite"
     )
     for item in validator_items:
-        if item.category in validators:
+        resolution = resolution_by_category.get(item.category)
+        if item.category in validators and (
+            resolution is None or resolution.outcome not in _SATISFYING_PREREQUISITE_OUTCOMES
+        ):
             resolution_by_category[item.category] = PrerequisiteResolution(
                 item.category,
                 "exact-validator",
@@ -786,23 +814,25 @@ def drive_terminal(
                     "no exact validator or equivalent evidence available",
                 ),
             )
+        preflight_evidence = {
+            item.item_id: evidence
+            for item in (*protected_paths, *validator_items)
+            if (evidence := _transition_evidence(item, {}, resolution_by_category, granted))
+        }
+        applied_checklist = _applied_checklist(state.checklist, preflight_evidence)
         blocker = Blocker(
             "external-state",
             "missing validator prerequisite for: "
             + ", ".join(f"{item.item_id} (validator:{item.category})" for item in missing_validators),
-            tuple(item.item_id for item in state.checklist if not item.completed),
+            tuple(item.item_id for item in applied_checklist if not item.completed),
             derived=True,
         )
         blockers = state.blockers + (blocker,)
         verdict = _blocker_verdict(blockers)
-        granted_paths = {
-            item.item_id: f"authorization granted: protected-path:{item.category}"
-            for item in protected_paths
-        }
         return ContinuationResult(
             replace(
                 state,
-                checklist=_applied_checklist(state.checklist, granted_paths),
+                checklist=applied_checklist,
                 blockers=blockers,
                 requested_authorizations=state.requested_authorizations.union(validator_requests),
                 prerequisite_resolutions=_resolution_tuple(resolution_by_category),
@@ -822,7 +852,7 @@ def drive_terminal(
     )
     if pending:
         cleared_checklist = _cleared_later_completed_gates(
-            state.checklist, _completion_sort_key(pending[0])
+            state.checklist, _INTERNAL_ORDER[pending[0].kind]
         )
         if cleared_checklist != state.checklist:
             state = replace(state, checklist=cleared_checklist)
@@ -862,7 +892,7 @@ def drive_terminal(
         applied_checklist = _applied_checklist(state.checklist, evidence_by_item)
         if first_unevidenced_key is not None:
             applied_checklist = _cleared_later_routine_evidence(
-                applied_checklist, first_unevidenced_key
+                applied_checklist, first_unevidenced_key[0]
             )
         return ContinuationResult(
             replace(

@@ -79,7 +79,7 @@ When agent capacity is unavailable or only one safe slice exists, execute the sa
 
 ## Convergence and completion
 
-After the initial task list is complete, the drive loop invokes `$speckit-converge` under the controller identity. Validate that its only write is the expected append-only `tasks.md` patch, record the before/after hashes, and reject any other mutation. If it appends tasks, execute them through the same scheduler, TDD, review, and correction gates without asking the user again. Permit at most two convergence implementation cycles. Stop only when the same root gap needs a material decision, a new high-severity contradiction is unresolved, or an external-state failure prevents verification.
+After the initial task list is complete, the drive loop invokes `$speckit-converge` under the controller identity. Validate that its only write is the expected append-only `tasks.md` patch, record the before/after hashes, and reject any other mutation. If it appends tasks, execute them through the same scheduler, TDD, review, and correction gates without asking the user again. Permit at most two convergence implementation cycles under the initial authorization. If gaps remain after that budget, record a `missing-authority` blocker for the affected checklist items, request a bounded extension once, and return `BLOCKED ON DECISION` until it is granted; preserve the consumed cycle count on resume. Otherwise, stop only when the same root gap needs a material decision, a new high-severity contradiction is unresolved, or an external-state failure prevents verification.
 
 Before completion:
 
