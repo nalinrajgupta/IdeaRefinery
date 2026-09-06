@@ -295,6 +295,20 @@ def test_completion_checklist_rejects_unknown_terminal_verdict() -> None:
         continuation.validate_completion_checklist(state)
 
 
+def test_completion_checklist_rejects_missing_terminal_verdict() -> None:
+    """Catches a completed checklist being accepted without a persisted verdict."""
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem(
+                "verify", "final-verification", completed=True, evidence="full suite passed"
+            ),
+        ),
+    )
+
+    with pytest.raises(ContractError, match="requires a terminal verdict"):
+        continuation.validate_completion_checklist(state)
+
+
 def test_completion_checklist_rejects_blocked_verdict_without_blockers() -> None:
     """Catches a blocked terminal label being trusted without blocker evidence."""
     state = continuation.ContinuationState(

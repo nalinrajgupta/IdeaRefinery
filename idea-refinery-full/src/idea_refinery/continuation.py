@@ -250,6 +250,11 @@ def validate_completion_checklist(state: ContinuationState) -> None:
             "non-terminal state has actionable internal checklist items",
             {"item_ids": pending_internal},
         )
+    if state.terminal_verdict is None:
+        raise ContractError(
+            "terminal-verdict-missing",
+            "completion checklist requires a terminal verdict",
+        )
     if state.terminal_verdict and not is_terminal:
         raise ContractError(
             "unknown-terminal-verdict",
