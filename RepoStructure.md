@@ -15,13 +15,14 @@ IdeaRefinery/
 ├── .idea-refinery/                 # optional per-repository role/config overrides
 ├── .specify/                       # Spec Kit configuration, templates, and scripts
 ├── .agents/skills/speckit-*/       # repository-local Spec Kit skills
-├── .agents/skills/idea-refinery-*/ # generated Copilot/Hermes skill distribution
+├── .agents/skills/refine-idea/     # generated refinement distribution
+├── .agents/skills/implement-refine-idea/ # generated implementation distribution
 └── .github/workflows/              # deterministic runtime CI
 ```
 
 The two skill folders are intentionally separate. `refine-idea/` owns refinement and stops at an implementation-ready handoff. `implement-refine-idea/` consumes that handoff and has separate authority to edit application code and tests.
 
-`tools/sync_host_skills.py` generates `.agents/skills/idea-refinery-*` from the canonical folders and copies their required references. GitHub Copilot discovers this standard project-skill location; Hermes can use it as an external source or receive a copy under its skill home. See [host compatibility](docs/host-compatibility.md).
+`tools/sync_host_skills.py` generates `.agents/skills/refine-idea` and `.agents/skills/implement-refine-idea` from the canonical folders and copies their required references. GitHub Copilot discovers this standard project-skill location; Hermes can use it as an external source or receive a copy under its skill home. See [host compatibility](docs/host-compatibility.md).
 
 `.idea-refinery/config.yaml` is optional and may exist in a target repository even when it is absent from this checkout. Its role assignments override bundled defaults but remain below invocation-level overrides.
 
@@ -183,7 +184,7 @@ specs/<feature-id>/
 | Checked-in feature design | `specs/001-*`, `specs/002-*` | Preserve requirement IDs, decisions, and audit history |
 | Per-target generated artifacts | A target repository's `specs/<feature-id>/` | Controller-owned; component workers must not overwrite shared state |
 | Ephemeral local output | `.venv/`, `.pytest_cache/`, `.hypothesis/`, bytecode | Do not document as product source or commit accidentally |
-| Global registration | `~/.codex/skills/idea-refinery-*` symlinks | Points to source; removing a link does not remove the source |
+| Global registration | `~/.codex/skills/refine-idea` and `~/.codex/skills/implement-refine-idea` symlinks | Points to source; removing a link does not remove the source |
 
 ## Common use cases
 

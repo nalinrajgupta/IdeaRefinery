@@ -43,7 +43,7 @@ Verify that every pull request preserves these boundaries:
 - Review workers are read-only. Shared task, run, and state artifacts remain controller-owned.
 - Existing Spec Kit configuration must be preserved. Initialization or forced replacement must require explicit approval.
 - Requirement identifiers, decisions, findings, stage history, and audit evidence must remain traceable across `spec.md`, `plan.md`, `tasks.md`, `refinery-state.md`, and `implementation-state.md`.
-- Canonical skill sources live in `refine-idea` and `implement-refine-idea`. Generated copies under `.agents/skills/idea-refinery-*` must not be edited directly and must remain synchronized.
+- Canonical skill sources live in `refine-idea` and `implement-refine-idea`. Generated copies under `.agents/skills/refine-idea` and `.agents/skills/implement-refine-idea` must not be edited directly and must remain synchronized.
 - Changes to schemas or persisted formats must account for existing artifacts and include compatibility, migration, or explicit rejection behavior.
 - Commits, pushes, pull requests, merges, deployments, destructive cleanup, and repository-structure changes require separate authorization.
 

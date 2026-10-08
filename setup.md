@@ -6,10 +6,10 @@ This guide covers GitHub Copilot and Codex installation, invocation, update, rem
 
 | Host | Mode | Best for | Installed location |
 | --- | --- | --- | --- |
-| GitHub Copilot | Repository-local skills | One project and checked-in team configuration | `.agents/skills/idea-refinery-*` |
-| GitHub Copilot | Personal copied skills | Reuse across repositories | `~/.copilot/skills/idea-refinery-*` |
+| GitHub Copilot | Repository-local skills | One project and checked-in team configuration | `.agents/skills/refine-idea`, `.agents/skills/implement-refine-idea` |
+| GitHub Copilot | Personal copied skills | Reuse across repositories | `~/.copilot/skills/refine-idea`, `~/.copilot/skills/implement-refine-idea` |
 | Codex | Direct-file session | Testing one checkout or branch | No registration |
-| Codex | Global symlink | Reuse across repositories | `~/.codex/skills/idea-refinery-*` |
+| Codex | Global symlink | Reuse across repositories | `~/.codex/skills/refine-idea`, `~/.codex/skills/implement-refine-idea` |
 
 ## Prerequisites
 
@@ -185,6 +185,20 @@ foreach ($Skill in $Skills) {
 }
 ```
 
+After both new copies verify successfully, remove any retired personal copies:
+
+```powershell
+$TargetRoot = Join-Path $HOME ".copilot\skills"
+$LegacySkills = @("idea-refinery-full", "idea-refinery-implement")
+
+foreach ($Skill in $LegacySkills) {
+    $Target = Join-Path $TargetRoot $Skill
+    if (Test-Path -LiteralPath $Target) {
+        Remove-Item -LiteralPath $Target -Recurse -Force -ErrorAction Stop
+    }
+}
+```
+
 Remove only the two personal skills; missing folders are treated as already removed:
 
 ```powershell
@@ -295,6 +309,15 @@ for skill in $SKILLS; do
 done
 ```
 
+After both new copies verify successfully, remove any retired personal copies:
+
+```bash
+TARGET_ROOT="$HOME/.copilot/skills"
+for skill in idea-refinery-full idea-refinery-implement; do
+  rm -rf -- "$TARGET_ROOT/$skill"
+done
+```
+
 Remove only the two personal skills; `rm -rf --` is scoped to these resolved literal paths and succeeds when a target is missing:
 
 ```bash
@@ -374,7 +397,18 @@ ln -sfn "$REFINERY_REPO/implement-refine-idea" \
   ~/.codex/skills/implement-refine-idea
 ```
 
-Verify both links with `readlink`, then start a new Codex session. Updating the checkout updates the linked skills. Remove only the two links to uninstall.
+Verify both new links before removing any retired links, then start a new Codex session. Updating the checkout updates the linked skills:
+
+```bash
+REFINERY_REPO="/absolute/path/to/IdeaRefinery"
+test "$(readlink "$HOME/.codex/skills/refine-idea")" = "$REFINERY_REPO/refine-idea"
+test "$(readlink "$HOME/.codex/skills/implement-refine-idea")" = "$REFINERY_REPO/implement-refine-idea"
+for skill in idea-refinery-full idea-refinery-implement; do
+  rm -rf -- "$HOME/.codex/skills/$skill"
+done
+```
+
+Remove only the two new links to uninstall.
 
 ## Validate the checkout
 

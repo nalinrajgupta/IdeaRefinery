@@ -161,6 +161,7 @@ def test_copilot_readme_has_first_class_quick_start() -> None:
 
 def test_copilot_setup_documents_safe_complete_lifecycle() -> None:
     setup = read_repository_text("setup.md")
+    setup_locations = section(setup, "## Choose a setup mode", "## Prerequisites")
     copilot = section(setup, "## GitHub Copilot", "## Codex")
     powershell = section(
         copilot,
@@ -168,6 +169,24 @@ def test_copilot_setup_documents_safe_complete_lifecycle() -> None:
         "### Personal installation on POSIX shells",
     )
     posix = section(copilot, "### Personal installation on POSIX shells")
+
+    assert_contains_all(
+        setup_locations,
+        (
+            ".agents/skills/refine-idea",
+            ".agents/skills/implement-refine-idea",
+            "~/.copilot/skills/refine-idea",
+            "~/.copilot/skills/implement-refine-idea",
+            "~/.codex/skills/refine-idea",
+            "~/.codex/skills/implement-refine-idea",
+        ),
+    )
+    for retired_path in (
+        ".agents/skills/idea-refinery-*",
+        "~/.copilot/skills/idea-refinery-*",
+        "~/.codex/skills/idea-refinery-*",
+    ):
+        assert retired_path not in setup_locations
 
     assert_contains_all(
         copilot,
@@ -204,6 +223,14 @@ def test_copilot_setup_documents_safe_complete_lifecycle() -> None:
     assert posix.count('SOURCE_ROOT="$REFINERY_REPO/.agents/skills"') >= 2
     assert posix.count('SKILLS="refine-idea implement-refine-idea"') >= 2
     assert posix.index('test -f "$SOURCE_ROOT/$skill/SKILL.md"') < posix.index("STAGING_ROOT=")
+    assert posix.index('diff -qr "$SOURCE_ROOT/$skill" "$TARGET_ROOT/$skill"') < posix.index(
+        "for skill in idea-refinery-full idea-refinery-implement; do"
+    )
+    assert "idea-refinery-full" in powershell
+    assert "idea-refinery-implement" in powershell
+    assert powershell.index("Installed skill differs from generated source") < powershell.index(
+        '$LegacySkills = @("idea-refinery-full", "idea-refinery-implement")'
+    )
     assert "[host compatibility](docs/host-compatibility.md)" in setup
 
 
