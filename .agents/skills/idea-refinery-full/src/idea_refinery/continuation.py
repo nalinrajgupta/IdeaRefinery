@@ -1,0 +1,1029 @@
+"""Deterministic continuation contracts for implementation runs."""
+
+from __future__ import annotations
+
+from collections.abc import Collection, Mapping
+from dataclasses import dataclass, replace
+import json
+from pathlib import Path
+from typing import Any
+
+from .errors import ContractError, StateError
+
+
+_INTERNAL_ORDER = {
+    "protected-path-authorization": -2,
+    "validator-prerequisite": -1,
+    "task": 0,
+    "review": 1,
+    "review-correction": 2,
+    "task-promotion": 3,
+    "state-recording": 4,
+    "convergence": 5,
+    "after-hook": 6,
+    "final-verification": 7,
+}
+_BLOCKER_VERDICTS = {
+    "missing-authority": "BLOCKED ON DECISION",
+    "material-decision": "BLOCKED ON DECISION",
+    "external-state": "BLOCKED ON VERIFICATION",
+}
+_TERMINAL_VERDICTS = frozenset({"IMPLEMENTATION COMPLETE", *_BLOCKER_VERDICTS.values()})
+_PREREQUISITE_OUTCOMES = frozenset({"exact-validator", "equivalent-evidence", "unavailable"})
+_SATISFYING_PREREQUISITE_OUTCOMES = frozenset({"exact-validator", "equivalent-evidence"})
+
+
+@dataclass(frozen=True)
+class CompletionItem:
+    """One independently observable implementation completion gate."""
+
+    item_id: str
+    kind: str
+    completed: bool = False
+    category: str | None = None
+    evidence: str | None = None
+    dependencies: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Blocker:
+    """A genuine stop that requires authority, a decision, or external recovery."""
+
+    category: str
+    detail: str
+    affected_item_ids: tuple[str, ...]
+    derived: bool = False
+    """True when the drive loop generated this blocker and must re-evaluate it on resume."""
+
+
+@dataclass(frozen=True)
+class PrerequisiteResolution:
+    """Persisted evidence that a validator prerequisite is met or unavailable."""
+
+    category: str
+    outcome: str
+    evidence: str
+
+
+@dataclass(frozen=True)
+class ContinuationState:
+    """Checklist snapshot consumed by the terminal-verdict drive loop."""
+
+    checklist: tuple[CompletionItem, ...]
+    requested_authorizations: frozenset[str] = frozenset()
+    blockers: tuple[Blocker, ...] = ()
+    prerequisite_resolutions: tuple[PrerequisiteResolution, ...] = ()
+    terminal_verdict: str | None = None
+    granted_authorizations: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True)
+class ContinuationResult:
+    """The terminal result of one deterministic continuation drive."""
+
+    state: ContinuationState
+    verdict: str
+    completed_item_ids: tuple[str, ...]
+    authorization_requests: tuple[str, ...] = ()
+
+
+def _validate_contract(state: ContinuationState) -> None:
+    _validated_string_collection(state.granted_authorizations, field="granted_authorizations")
+    if not state.checklist:
+        raise ContractError(
+            "completion-checklist-empty",
+            "continuation state requires an explicit completion checklist",
+        )
+    invalid_item_ids = [
+        item.item_id
+        for item in state.checklist
+        if not isinstance(item.item_id, str) or not item.item_id.strip()
+    ]
+    if invalid_item_ids:
+        raise ContractError(
+            "completion-item-id-invalid",
+            "completion checklist item_id must be a non-empty string",
+            {"item_ids": invalid_item_ids},
+        )
+    invalid_completed = [
+        item.item_id for item in state.checklist if type(item.completed) is not bool
+    ]
+    if invalid_completed:
+        raise ContractError(
+            "completion-completed-invalid",
+            "completion completed must be a boolean",
+            {"item_ids": invalid_completed},
+        )
+    invalid_evidence = [
+        item.item_id
+        for item in state.checklist
+        if item.evidence is not None and (not isinstance(item.evidence, str) or not item.evidence.strip())
+    ]
+    if invalid_evidence:
+        raise ContractError(
+            "completion-evidence-invalid",
+            "completion evidence must be a non-empty string when present",
+            {"item_ids": invalid_evidence},
+        )
+    unevidenced_completed = [item.item_id for item in state.checklist if item.completed and not item.evidence]
+    if unevidenced_completed:
+        raise ContractError(
+            "completion-evidence-missing",
+            "completed checklist items require recorded acceptance evidence",
+            {"item_ids": unevidenced_completed},
+        )
+    seen_item_ids: set[str] = set()
+    duplicate_item_ids: set[str] = set()
+    for item in state.checklist:
+        if item.item_id in seen_item_ids:
+            duplicate_item_ids.add(item.item_id)
+        seen_item_ids.add(item.item_id)
+    if duplicate_item_ids:
+        raise ContractError(
+            "completion-item-id-duplicate",
+            "completion checklist item ids must be unique",
+            {"item_ids": sorted(duplicate_item_ids)},
+        )
+    invalid_kinds = [
+        item.item_id
+        for item in state.checklist
+        if not isinstance(item.kind, str) or not item.kind.strip()
+    ]
+    if invalid_kinds:
+        raise ContractError(
+            "completion-kind-invalid",
+            "completion checklist kind must be a non-empty string",
+            {"item_ids": invalid_kinds},
+        )
+    unknown_kinds = sorted({item.kind for item in state.checklist} - set(_INTERNAL_ORDER))
+    if unknown_kinds:
+        raise ContractError("unknown-completion-kind", "unknown completion checklist kind", {"kinds": unknown_kinds})
+    for item in state.checklist:
+        if not isinstance(item.dependencies, tuple) or any(
+            not isinstance(dependency, str) or not dependency.strip()
+            for dependency in item.dependencies
+        ):
+            raise ContractError(
+                "completion-dependencies-invalid",
+                "completion dependencies must be a tuple of non-empty item ids",
+                {"item_id": item.item_id},
+            )
+        unknown_dependencies = set(item.dependencies) - seen_item_ids
+        if unknown_dependencies:
+            raise ContractError(
+                "completion-dependency-unknown",
+                "completion dependencies must reference checklist items",
+                {"item_id": item.item_id, "dependencies": sorted(unknown_dependencies)},
+            )
+    _ordered_checklist(state.checklist)
+    final_verification_ids = {
+        item.item_id for item in state.checklist if item.kind == "final-verification"
+    }
+    final_dependents = _dependent_item_ids(state.checklist, final_verification_ids)
+    invalid_final_dependents = [
+        item.item_id
+        for item in state.checklist
+        if item.item_id in final_dependents
+        and 0 <= _INTERNAL_ORDER[item.kind] < _INTERNAL_ORDER["final-verification"]
+    ]
+    if invalid_final_dependents:
+        raise ContractError(
+            "completion-final-verification-dependency-invalid",
+            "routine work must not depend on final verification",
+            {"item_ids": invalid_final_dependents},
+        )
+    invalid_blockers = sorted(
+        str(blocker.category)
+        for blocker in state.blockers
+        if (
+            not isinstance(blocker.category, str)
+            or not blocker.category.strip()
+            or not isinstance(blocker.detail, str)
+            or not blocker.detail.strip()
+        )
+    )
+    if invalid_blockers:
+        raise ContractError(
+            "blocker-invalid",
+            "blockers require category and detail",
+            {"categories": invalid_blockers},
+        )
+    invalid_blocker_items = [
+        blocker.category
+        for blocker in state.blockers
+        if not isinstance(blocker.affected_item_ids, tuple)
+        or not blocker.affected_item_ids
+        or any(
+            not isinstance(item_id, str) or not item_id.strip()
+            for item_id in blocker.affected_item_ids
+        )
+    ]
+    if invalid_blocker_items:
+        raise ContractError(
+            "blocker-affected-items-invalid",
+            "blockers require explicit affected checklist item ids",
+            {"categories": invalid_blocker_items},
+        )
+    checklist_item_ids = {item.item_id for item in state.checklist}
+    unknown_blocker_items = sorted(
+        {
+            item_id
+            for blocker in state.blockers
+            for item_id in blocker.affected_item_ids
+            if item_id not in checklist_item_ids
+        }
+    )
+    if unknown_blocker_items:
+        raise ContractError(
+            "blocker-affected-item-unknown",
+            "blocker affected item ids must reference checklist items",
+            {"item_ids": unknown_blocker_items},
+        )
+    invalid_preflight_categories = sorted(
+        item.item_id
+        for item in state.checklist
+        if item.kind in {"protected-path-authorization", "validator-prerequisite"}
+        and (not isinstance(item.category, str) or not item.category.strip())
+    )
+    if invalid_preflight_categories:
+        raise ContractError(
+            "completion-category-missing",
+            "completion category is required and must be a non-empty string for preflight gates",
+            {"item_ids": invalid_preflight_categories},
+        )
+    unknown_blockers = sorted({blocker.category for blocker in state.blockers} - set(_BLOCKER_VERDICTS))
+    if unknown_blockers:
+        raise ContractError("unknown-blocker-category", "unknown blocker category", {"categories": unknown_blockers})
+    invalid_derived = sorted(
+        blocker.category for blocker in state.blockers if type(blocker.derived) is not bool
+    )
+    if invalid_derived:
+        raise ContractError(
+            "blocker-derived-invalid",
+            "blocker derived flag must be a boolean",
+            {"categories": invalid_derived},
+        )
+    invalid_resolution_fields = sorted(
+        str(resolution.category)
+        for resolution in state.prerequisite_resolutions
+        if not isinstance(resolution.category, str)
+        or not resolution.category.strip()
+        or not isinstance(resolution.outcome, str)
+        or not resolution.outcome.strip()
+        or not isinstance(resolution.evidence, str)
+        or not resolution.evidence.strip()
+    )
+    if invalid_resolution_fields:
+        raise ContractError(
+            "prerequisite-resolution-invalid",
+            "prerequisite resolution requires category, outcome, and evidence",
+            {"categories": invalid_resolution_fields},
+        )
+    unknown_outcomes = sorted(
+        {resolution.outcome for resolution in state.prerequisite_resolutions}
+        - _PREREQUISITE_OUTCOMES
+    )
+    if unknown_outcomes:
+        raise ContractError(
+            "unknown-prerequisite-outcome",
+            "unknown prerequisite resolution outcome",
+            {"outcomes": unknown_outcomes},
+        )
+    seen_resolution_categories: set[str] = set()
+    duplicate_resolution_categories: set[str] = set()
+    for resolution in state.prerequisite_resolutions:
+        if resolution.category in seen_resolution_categories:
+            duplicate_resolution_categories.add(resolution.category)
+        seen_resolution_categories.add(resolution.category)
+    if duplicate_resolution_categories:
+        raise ContractError(
+            "prerequisite-resolution-duplicate",
+            "prerequisite resolution categories must be unique",
+            {"categories": sorted(duplicate_resolution_categories)},
+        )
+    resolutions = {
+        resolution.category: resolution for resolution in state.prerequisite_resolutions
+    }
+    for item in state.checklist:
+        if not item.completed:
+            continue
+        if item.kind == "protected-path-authorization":
+            expected_evidence = f"authorization granted: protected-path:{item.category}"
+        elif item.kind == "validator-prerequisite":
+            expected_evidence = _transition_evidence(item, {}, resolutions, frozenset())
+        else:
+            continue
+        if item.evidence != expected_evidence:
+            raise ContractError(
+                "completion-preflight-evidence-invalid",
+                "completed preflight gates require matching scoped acceptance evidence",
+                {"item_id": item.item_id},
+            )
+
+
+def validate_completion_checklist(state: ContinuationState) -> None:
+    """Reject unsupported blockers and unsafe non-terminal pauses."""
+    _validate_contract(state)
+    if not isinstance(state.terminal_verdict, str):
+        _validate_terminal_verdict(state)
+    pending_internal_items = [
+        item
+        for item in state.checklist
+        if not item.completed and item.kind in _INTERNAL_ORDER and _INTERNAL_ORDER[item.kind] >= 0
+    ]
+    pending_items = [item for item in state.checklist if not item.completed]
+    pending_internal = [item.item_id for item in pending_internal_items]
+    is_terminal = state.terminal_verdict in _TERMINAL_VERDICTS
+    if not is_terminal and pending_internal:
+        raise StateError(
+            "actionable-internal-checklist",
+            "non-terminal state has actionable internal checklist items",
+            {"item_ids": pending_internal},
+        )
+    if state.terminal_verdict is None:
+        raise ContractError(
+            "terminal-verdict-missing",
+            "completion checklist requires a terminal verdict",
+        )
+    if state.terminal_verdict and not is_terminal:
+        raise ContractError(
+            "unknown-terminal-verdict",
+            "unknown terminal verdict",
+            {"terminal_verdict": state.terminal_verdict},
+        )
+    _validate_terminal_verdict(state)
+    if state.terminal_verdict == "IMPLEMENTATION COMPLETE":
+        if not any(item.kind == "final-verification" for item in state.checklist):
+            raise ContractError(
+                "completion-required-kind-missing",
+                "completion checklist requires a final-verification gate",
+            )
+        if pending_items:
+            raise StateError(
+                "incomplete-terminal-checklist",
+                "completion verdict requires every checklist item to be complete",
+            )
+        if state.blockers:
+            raise StateError(
+                "completion-verdict-blocker-mismatch",
+                "completion verdict cannot retain blocker records",
+            )
+    if state.terminal_verdict in _BLOCKER_VERDICTS.values():
+        if not pending_items:
+            raise StateError(
+                "blocked-terminal-checklist-complete",
+                "blocked terminal verdict requires incomplete checklist items",
+            )
+        _validate_blocked_terminal_state(state, pending_items)
+
+
+def _validate_terminal_verdict(state: ContinuationState) -> None:
+    """Reject a persisted terminal label outside the supported verdict contract."""
+    if state.terminal_verdict is None:
+        return
+    if not isinstance(state.terminal_verdict, str) or state.terminal_verdict not in _TERMINAL_VERDICTS:
+        raise ContractError(
+            "unknown-terminal-verdict",
+            "unknown terminal verdict",
+            {"terminal_verdict": state.terminal_verdict},
+        )
+
+
+def _blocker_verdict(blockers: tuple[Blocker, ...]) -> str:
+    verdicts = {_BLOCKER_VERDICTS[blocker.category] for blocker in blockers}
+    return "BLOCKED ON DECISION" if "BLOCKED ON DECISION" in verdicts else "BLOCKED ON VERIFICATION"
+
+
+def _validate_blocked_terminal_state(
+    state: ContinuationState, pending_items: list[CompletionItem]
+) -> None:
+    if not state.blockers:
+        raise StateError(
+            "terminal-blocker-missing",
+            "blocked terminal verdict requires blocker records",
+        )
+    expected_verdict = _blocker_verdict(state.blockers)
+    if state.terminal_verdict != expected_verdict:
+        raise StateError(
+            "terminal-verdict-blocker-mismatch",
+            "blocked terminal verdict must match blocker categories",
+            {"terminal_verdict": state.terminal_verdict, "blocker_verdict": expected_verdict},
+        )
+    blocked_item_ids = {
+        item_id for blocker in state.blockers for item_id in blocker.affected_item_ids
+    }
+    uncovered_items = [
+        item.item_id
+        for item in pending_items
+        if item.item_id not in blocked_item_ids
+    ]
+    if uncovered_items:
+        raise StateError(
+            "incomplete-checklist-blocker-missing",
+            "blocked terminal verdict requires blockers for every incomplete checklist item",
+            {"item_ids": uncovered_items},
+        )
+
+
+def _completion_sort_key(item: CompletionItem) -> tuple[int, str]:
+    return (_INTERNAL_ORDER[item.kind], item.item_id)
+
+
+def _ordered_checklist(checklist: tuple[CompletionItem, ...]) -> tuple[CompletionItem, ...]:
+    """Order dependencies first, breaking ties by workflow kind and item id."""
+    remaining = sorted(checklist, key=_completion_sort_key)
+    ordered: list[CompletionItem] = []
+    visited: set[str] = set()
+    while remaining:
+        item = next((item for item in remaining if set(item.dependencies) <= visited), None)
+        if item is None:
+            raise ContractError(
+                "completion-dependency-cycle",
+                "completion dependencies must not contain cycles",
+            )
+        remaining.remove(item)
+        ordered.append(item)
+        visited.add(item.item_id)
+    return tuple(ordered)
+
+
+def _dependent_item_ids(
+    checklist: tuple[CompletionItem, ...], item_ids: Collection[str]
+) -> set[str]:
+    """Find only transitive dependents, including dependents of the same kind."""
+    affected = set(item_ids)
+    dependents: set[str] = set()
+    for item in _ordered_checklist(checklist):
+        if affected.intersection(item.dependencies):
+            affected.add(item.item_id)
+            dependents.add(item.item_id)
+    return dependents
+
+
+def _cleared_dependent_evidence(
+    checklist: tuple[CompletionItem, ...], pending_item_ids: Collection[str]
+) -> tuple[CompletionItem, ...]:
+    """Invalidate evidence only for gates depending on pending work."""
+    dependent_ids = _dependent_item_ids(checklist, pending_item_ids)
+    return tuple(
+        replace(item, completed=False, evidence=None)
+        if item.item_id in dependent_ids and (item.completed or item.evidence)
+        else item
+        for item in checklist
+    )
+
+
+def _new_authorization_requests(
+    prefix: str,
+    items: Collection[CompletionItem],
+    requested: frozenset[str],
+) -> tuple[str, ...]:
+    scoped = dict.fromkeys(f"{prefix}:{item.category}" for item in items)
+    return tuple(token for token in scoped if token not in requested)
+
+
+def _resolution_tuple(
+    resolutions: dict[str, PrerequisiteResolution],
+) -> tuple[PrerequisiteResolution, ...]:
+    return tuple(resolutions[category] for category in sorted(resolutions))
+
+
+def _validated_action_results(action_results: Mapping[str, str] | None) -> dict[str, str]:
+    """Reject malformed executed-action results before they authorize completion."""
+    if action_results is None:
+        return {}
+    if not isinstance(action_results, Mapping):
+        raise ContractError("action-results-invalid", "action results must be a mapping")
+    invalid = sorted(
+        str(item_id)
+        for item_id, evidence in action_results.items()
+        if not isinstance(item_id, str)
+        or not item_id.strip()
+        or not isinstance(evidence, str)
+        or not evidence.strip()
+    )
+    if invalid:
+        raise ContractError(
+            "action-result-invalid",
+            "action result requires an item id and non-empty evidence",
+            {"item_ids": invalid},
+        )
+    return dict(action_results)
+
+
+def _validated_string_collection(values: Collection[str], *, field: str) -> frozenset[str]:
+    if (
+        not isinstance(values, Collection)
+        or isinstance(values, (str, bytes, Mapping))
+        or any(not isinstance(value, str) or not value.strip() for value in values)
+    ):
+        raise ContractError(
+            field.replace("_", "-") + "-invalid",
+            f"{field} must be a non-string collection of non-empty strings",
+        )
+    return frozenset(values)
+
+
+def _require_nonempty_string(value: Any, *, code: str, field: str, item_index: int) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ContractError(
+            code,
+            f"{field} must be a non-empty string",
+            {"item_index": item_index, "field": field},
+        )
+    return value
+
+
+def continuation_state_from_document(document: dict[str, Any]) -> ContinuationState:
+    """Load a provider-independent continuation state from a replay document."""
+    if not isinstance(document, dict):
+        raise ContractError(
+            "continuation-document-invalid",
+            "continuation document must be an object",
+        )
+    raw_checklist = document.get("checklist", [])
+    if not isinstance(raw_checklist, list):
+        raise ContractError("checklist-invalid", "checklist must be a list")
+    checklist_items: list[CompletionItem] = []
+    for item_index, item in enumerate(raw_checklist):
+        if not isinstance(item, dict):
+            raise ContractError(
+                "completion-item-invalid",
+                "completion checklist item must be an object",
+                {"item_index": item_index},
+            )
+        item_id = _require_nonempty_string(
+            item.get("item_id"),
+            code="completion-item-id-invalid",
+            field="item_id",
+            item_index=item_index,
+        )
+        kind = _require_nonempty_string(
+            item.get("kind"),
+            code="completion-kind-invalid",
+            field="kind",
+            item_index=item_index,
+        )
+        completed = item.get("completed", False)
+        if type(completed) is not bool:
+            raise ContractError(
+                "completion-completed-invalid",
+                "completion completed must be a boolean",
+                {"item_index": item_index},
+            )
+        category = item.get("category")
+        if kind in {"protected-path-authorization", "validator-prerequisite"}:
+            category = _require_nonempty_string(
+                category,
+                code="completion-category-invalid",
+                field="category",
+                item_index=item_index,
+            )
+        elif category is not None:
+            category = _require_nonempty_string(
+                category,
+                code="completion-category-invalid",
+                field="category",
+                item_index=item_index,
+            )
+        evidence = item.get("evidence")
+        if evidence is not None:
+            evidence = _require_nonempty_string(
+                evidence,
+                code="completion-evidence-invalid",
+                field="evidence",
+                item_index=item_index,
+            )
+        dependencies = item.get("dependencies", [])
+        if not isinstance(dependencies, list):
+            raise ContractError(
+                "completion-dependencies-invalid",
+                "completion dependencies must be a list of non-empty item ids",
+                {"item_index": item_index},
+            )
+        dependencies = tuple(
+            _require_nonempty_string(
+                dependency,
+                code="completion-dependencies-invalid",
+                field="dependencies",
+                item_index=item_index,
+            )
+            for dependency in dependencies
+        )
+        checklist_items.append(CompletionItem(item_id, kind, completed, category, evidence, dependencies))
+    checklist = tuple(checklist_items)
+    raw_blockers = document.get("blockers", [])
+    if not isinstance(raw_blockers, list):
+        raise ContractError("blockers-invalid", "blockers must be a list")
+    blockers: list[Blocker] = []
+    for item_index, item in enumerate(raw_blockers):
+        if not isinstance(item, dict):
+            raise ContractError(
+                "blocker-invalid",
+                "blocker must be an object",
+                {"item_index": item_index},
+            )
+        category = _require_nonempty_string(
+            item.get("category"),
+            code="blocker-category-invalid",
+            field="category",
+            item_index=item_index,
+        )
+        if category not in _BLOCKER_VERDICTS:
+            raise ContractError(
+                "unknown-blocker-category",
+                "unknown blocker category",
+                {"item_index": item_index, "category": category},
+            )
+        detail = _require_nonempty_string(
+            item.get("detail"),
+            code="blocker-detail-invalid",
+            field="detail",
+            item_index=item_index,
+        )
+        derived = item.get("derived", False)
+        if type(derived) is not bool:
+            raise ContractError(
+                "blocker-derived-invalid",
+                "blocker derived flag must be a boolean",
+                {"item_index": item_index},
+            )
+        affected_item_ids = item.get("affected_item_ids")
+        if not isinstance(affected_item_ids, list) or not affected_item_ids:
+            raise ContractError(
+                "blocker-affected-items-invalid",
+                "blocker affected_item_ids must be a non-empty list",
+                {"item_index": item_index},
+            )
+        affected_item_ids = tuple(
+            _require_nonempty_string(
+                item_id,
+                code="blocker-affected-items-invalid",
+                field="affected_item_ids",
+                item_index=item_index,
+            )
+            for item_id in affected_item_ids
+        )
+        blockers.append(Blocker(category, detail, affected_item_ids, derived))
+    raw_resolutions = document.get("prerequisite_resolutions", [])
+    if not isinstance(raw_resolutions, list):
+        raise ContractError(
+            "prerequisite-resolutions-invalid",
+            "prerequisite resolutions must be a list",
+        )
+    resolutions: list[PrerequisiteResolution] = []
+    for item_index, item in enumerate(raw_resolutions):
+        if not isinstance(item, dict):
+            raise ContractError(
+                "prerequisite-resolution-invalid",
+                "prerequisite resolution must be an object",
+                {"item_index": item_index},
+            )
+        category = _require_nonempty_string(
+            item.get("category"),
+            code="prerequisite-resolution-category-invalid",
+            field="category",
+            item_index=item_index,
+        )
+        outcome = _require_nonempty_string(
+            item.get("outcome"),
+            code="prerequisite-resolution-outcome-invalid",
+            field="outcome",
+            item_index=item_index,
+        )
+        if outcome not in _PREREQUISITE_OUTCOMES:
+            raise ContractError(
+                "prerequisite-resolution-outcome-invalid",
+                "unknown prerequisite resolution outcome",
+                {"item_index": item_index, "outcome": outcome},
+            )
+        evidence = _require_nonempty_string(
+            item.get("evidence"),
+            code="prerequisite-resolution-evidence-invalid",
+            field="evidence",
+            item_index=item_index,
+        )
+        resolutions.append(PrerequisiteResolution(category, outcome, evidence))
+    raw_requested_authorizations = document.get("requested_authorizations", [])
+    if not isinstance(raw_requested_authorizations, list):
+        raise ContractError(
+            "requested-authorizations-invalid",
+            "requested authorizations must be a list",
+        )
+    requested_authorizations = frozenset(
+        _require_nonempty_string(
+            value,
+            code="requested-authorization-invalid",
+            field="requested_authorizations",
+            item_index=item_index,
+        )
+        for item_index, value in enumerate(raw_requested_authorizations)
+    )
+    terminal_verdict = document.get("terminal_verdict")
+    if terminal_verdict is not None and not isinstance(terminal_verdict, str):
+        raise ContractError(
+            "terminal-verdict-invalid",
+            "terminal verdict must be a string or null",
+        )
+    return ContinuationState(
+        checklist=checklist,
+        requested_authorizations=requested_authorizations,
+        blockers=tuple(blockers),
+        prerequisite_resolutions=tuple(resolutions),
+        terminal_verdict=terminal_verdict,
+        granted_authorizations=_validated_string_collection(
+            document.get("granted_authorizations", []), field="granted_authorizations",
+        ),
+    )
+
+
+def continuation_result_document(result: ContinuationResult) -> dict[str, Any]:
+    """Serialize only the stable terminal-drive boundary for replay comparison."""
+    return {
+        "authorization_requests": list(result.authorization_requests),
+        "completed_item_ids": list(result.completed_item_ids),
+        "terminal_verdict": result.state.terminal_verdict,
+        "verdict": result.verdict,
+    }
+
+
+def replay_continuation_fixture(path: Path) -> dict[str, Any]:
+    """Execute a continuation replay fixture and compare its terminal boundary."""
+    document = json.loads((path / "input.json").read_text(encoding="utf-8"))
+    result = drive_terminal(
+        continuation_state_from_document(document),
+        granted_authorizations=document.get("granted_authorizations", []),
+        available_validators=document.get("available_validators", []),
+        action_results=document.get("action_results"),
+    )
+    actual = continuation_result_document(result)
+    expected = json.loads((path / "expected.json").read_text(encoding="utf-8"))
+    return {"passed": actual == expected, "expected": expected, "actual": actual}
+
+
+def _transition_evidence(
+    item: CompletionItem,
+    results: Mapping[str, str],
+    resolutions: Mapping[str, PrerequisiteResolution],
+    granted: frozenset[str],
+) -> str | None:
+    """Return the recorded evidence that authorizes completing one gate."""
+    if item.kind == "protected-path-authorization" and f"protected-path:{item.category}" in granted:
+        return f"authorization granted: protected-path:{item.category}"
+    if item.kind == "validator-prerequisite":
+        resolution = resolutions.get(item.category or "")
+        if resolution is not None and resolution.outcome in _SATISFYING_PREREQUISITE_OUTCOMES:
+            return f"{resolution.outcome}: {resolution.evidence}"
+        return None
+    recorded = results.get(item.item_id) or item.evidence
+    return recorded if isinstance(recorded, str) and recorded.strip() else None
+
+
+def _applied_checklist(
+    checklist: tuple[CompletionItem, ...], evidence_by_item: Mapping[str, str]
+) -> tuple[CompletionItem, ...]:
+    """Persist every evidenced transition so a later stop cannot discard it."""
+    return tuple(
+        replace(item, completed=True, evidence=evidence_by_item[item.item_id])
+        if item.item_id in evidence_by_item
+        else item
+        for item in checklist
+    )
+
+
+def _ready_preflight_evidence(
+    checklist: tuple[CompletionItem, ...], evidence_by_item: Mapping[str, str]
+) -> dict[str, str]:
+    """Accept preflight evidence only after every declared dependency is complete."""
+    completed = {item.item_id for item in checklist if item.completed}
+    ready: dict[str, str] = {}
+    for item in _ordered_checklist(checklist):
+        if item.item_id in evidence_by_item and set(item.dependencies) <= completed:
+            ready[item.item_id] = evidence_by_item[item.item_id]
+            completed.add(item.item_id)
+    return ready
+
+
+def drive_terminal(
+    state: ContinuationState,
+    *,
+    granted_authorizations: Collection[str] = (),
+    available_validators: Collection[str] = (),
+    action_results: Mapping[str, str] | None = None,
+) -> ContinuationResult:
+    """Complete every evidenced routine gate in deterministic workflow order."""
+    _validate_contract(state)
+    _validate_terminal_verdict(state)
+    if state.terminal_verdict is not None:
+        validate_completion_checklist(state)
+    results = _validated_action_results(action_results)
+    granted = frozenset(state.granted_authorizations).union(
+        _validated_string_collection(granted_authorizations, field="granted_authorizations")
+    )
+    validators = _validated_string_collection(available_validators, field="available_validators")
+    recorded_blockers = tuple(
+        blocker for blocker in state.blockers
+        if not blocker.derived or blocker.category == "material-decision"
+    )
+    recorded_blockers = tuple(
+        replace(
+            blocker,
+            affected_item_ids=tuple(dict.fromkeys((
+                *blocker.affected_item_ids,
+                *sorted(_dependent_item_ids(state.checklist, blocker.affected_item_ids)),
+            ))),
+        )
+        for blocker in recorded_blockers
+    )
+    state = replace(
+        state,
+        granted_authorizations=granted,
+        blockers=recorded_blockers,
+        checklist=_cleared_dependent_evidence(
+            state.checklist, [item.item_id for item in state.checklist if not item.completed]
+        ),
+    )
+    blocked_item_ids = {
+        item_id for blocker in recorded_blockers for item_id in blocker.affected_item_ids
+    }
+    protected_paths = sorted(
+        (
+            item
+            for item in state.checklist
+            if not item.completed
+            and item.item_id not in blocked_item_ids
+            and item.kind == "protected-path-authorization"
+        ),
+        key=lambda item: (item.category or "", item.item_id),
+    )
+    missing_paths = tuple(
+        item
+        for item in protected_paths
+        if f"protected-path:{item.category}" not in granted
+    )
+    authorization_requests = _new_authorization_requests(
+        "protected-path",
+        missing_paths,
+        state.requested_authorizations,
+    )
+    if missing_paths:
+        granted_paths = {
+            item.item_id: f"authorization granted: protected-path:{item.category}"
+            for item in protected_paths
+            if item not in missing_paths
+        }
+        granted_paths = _ready_preflight_evidence(state.checklist, granted_paths)
+        applied_checklist = _applied_checklist(state.checklist, granted_paths)
+        blocker = Blocker(
+            "missing-authority",
+            "missing protected-path authorization for: "
+            + ", ".join(
+                f"{item.item_id} (protected-path:{item.category})" for item in missing_paths
+            ),
+            tuple(item.item_id for item in applied_checklist if not item.completed),
+            derived=True,
+        )
+        verdict = "BLOCKED ON DECISION"
+        return ContinuationResult(
+            replace(
+                state,
+                checklist=applied_checklist,
+                blockers=state.blockers + (blocker,),
+                requested_authorizations=state.requested_authorizations.union(authorization_requests),
+                terminal_verdict=verdict,
+            ),
+            verdict,
+            tuple(granted_paths),
+            authorization_requests,
+        )
+    resolution_by_category = {
+        resolution.category: resolution for resolution in state.prerequisite_resolutions
+    }
+    validator_items = tuple(
+        item
+        for item in state.checklist
+        if not item.completed
+        and item.item_id not in blocked_item_ids
+        and item.kind == "validator-prerequisite"
+    )
+    for item in validator_items:
+        resolution = resolution_by_category.get(item.category)
+        if item.category in validators and (
+            resolution is None or resolution.outcome not in _SATISFYING_PREREQUISITE_OUTCOMES
+        ):
+            resolution_by_category[item.category] = PrerequisiteResolution(
+                item.category,
+                "exact-validator",
+                f"available validator: {item.category}",
+            )
+    missing_validators = sorted(
+        (
+            item
+            for item in validator_items
+            if resolution_by_category.get(item.category, PrerequisiteResolution("", "unavailable", "")).outcome
+            not in _SATISFYING_PREREQUISITE_OUTCOMES
+        ),
+        key=lambda item: (item.category or "", item.item_id),
+    )
+    validator_requests = _new_authorization_requests(
+        "validator",
+        missing_validators,
+        state.requested_authorizations,
+    )
+    if missing_validators:
+        for item in missing_validators:
+            resolution_by_category.setdefault(
+                item.category,
+                PrerequisiteResolution(
+                    item.category,
+                    "unavailable",
+                    "no exact validator or equivalent evidence available",
+                ),
+            )
+        preflight_evidence = {
+            item.item_id: evidence
+            for item in (*protected_paths, *validator_items)
+            if (evidence := _transition_evidence(item, {}, resolution_by_category, granted))
+        }
+        preflight_evidence = _ready_preflight_evidence(state.checklist, preflight_evidence)
+        applied_checklist = _applied_checklist(state.checklist, preflight_evidence)
+        blocker = Blocker(
+            "external-state",
+            "missing validator prerequisite for: "
+            + ", ".join(f"{item.item_id} (validator:{item.category})" for item in missing_validators),
+            tuple(item.item_id for item in applied_checklist if not item.completed),
+            derived=True,
+        )
+        blockers = state.blockers + (blocker,)
+        verdict = _blocker_verdict(blockers)
+        return ContinuationResult(
+            replace(
+                state,
+                checklist=applied_checklist,
+                blockers=blockers,
+                requested_authorizations=state.requested_authorizations.union(validator_requests),
+                prerequisite_resolutions=_resolution_tuple(resolution_by_category),
+                terminal_verdict=verdict,
+            ),
+            verdict,
+            tuple(preflight_evidence),
+            validator_requests,
+        )
+    pending = [
+        item for item in _ordered_checklist(state.checklist)
+        if not item.completed and item.item_id not in blocked_item_ids
+    ]
+    evidence_by_item: dict[str, str] = {}
+    unevidenced: list[str] = []
+    for item in pending:
+        evidence = _transition_evidence(item, results, resolution_by_category, granted)
+        if evidence:
+            evidence_by_item[item.item_id] = evidence
+        else:
+            unevidenced.append(item.item_id)
+            break
+    if unevidenced:
+        applied_checklist = _applied_checklist(state.checklist, evidence_by_item)
+        applied_checklist = _cleared_dependent_evidence(applied_checklist, unevidenced)
+        blocker = Blocker(
+            "external-state",
+            "no recorded transition evidence for: " + ", ".join(unevidenced),
+            tuple(
+                item.item_id
+                for item in applied_checklist
+                if not item.completed
+            ),
+            derived=True,
+        )
+        blockers = state.blockers + (blocker,)
+        verdict = _blocker_verdict(blockers)
+        return ContinuationResult(
+            replace(
+                state,
+                checklist=applied_checklist,
+                blockers=blockers,
+                prerequisite_resolutions=_resolution_tuple(resolution_by_category),
+                terminal_verdict=verdict,
+            ),
+            verdict,
+            tuple(evidence_by_item),
+        )
+    completed_item_ids = tuple(item.item_id for item in pending)
+    if recorded_blockers:
+        verdict = _blocker_verdict(recorded_blockers)
+        next_state = replace(
+            state,
+            checklist=_applied_checklist(state.checklist, evidence_by_item),
+            prerequisite_resolutions=_resolution_tuple(resolution_by_category),
+            terminal_verdict=verdict,
+        )
+        validate_completion_checklist(next_state)
+        return ContinuationResult(next_state, verdict, completed_item_ids)
+    next_state = replace(
+        state,
+        checklist=_applied_checklist(state.checklist, evidence_by_item),
+        prerequisite_resolutions=_resolution_tuple(resolution_by_category),
+        terminal_verdict="IMPLEMENTATION COMPLETE",
+    )
+    validate_completion_checklist(next_state)
+    return ContinuationResult(next_state, "IMPLEMENTATION COMPLETE", completed_item_ids)

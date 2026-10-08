@@ -1,0 +1,6 @@
+{
+  "checklist": [
+    {"evidence": "T001 promoted", "item_id": "tasks", "kind": "task-promotion"},
+    {"item_id": "verify", "kind": "final-verification"}
+  ]
+}

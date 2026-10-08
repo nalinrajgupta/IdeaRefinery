@@ -103,12 +103,12 @@ idea-refinery-implement/
 | Path | Purpose | Typical use |
 | --- | --- | --- |
 | `SKILL.md` | Explicit-only implementation controller | Invoke after a ready Idea Refinery handoff |
-| `ARCHITECTURE.md` | Explanation of entry, scheduling, TDD, review, convergence, and completion | Understand the difference between execution gates |
+| `ARCHITECTURE.md` | Explanation of preflight, scheduling, TDD, review correction, convergence, terminal drive, and completion | Understand the difference between execution gates |
 | `agents/openai.yaml` | UI metadata and explicit-only policy | Global or project skill discovery |
-| `references/orchestration-contract.md` | Normative worker envelopes, isolation, evidence, review, and recovery rules | Audit or extend implementation behavior |
-| `references/implementation-state-template.md` | Resumable wave, assignment, evidence, finding, and verification state | Create `implementation-state.md` in an active feature |
+| `references/orchestration-contract.md` | Normative preflight, completion checklist, worker envelopes, isolation, evidence, automatic review correction, and recovery rules | Audit or extend implementation behavior |
+| `references/implementation-state-template.md` | Resumable preflight, completion checklist, progress, wave, assignment, evidence, finding, and verification state | Create `implementation-state.md` in an active feature |
 
-This skill is instruction-backed; it does not currently have a Python sidecar. Add deterministic code only when repeated runtime behavior cannot be expressed or verified reliably through the existing contracts.
+This skill is instruction-backed. Continuation validation belongs to the deterministic `idea-refinery-full` sidecar because it must remain provider- and credential-independent; that sidecar validates replayable transitions only and is not a background monitor or scheduler. Add deterministic code only when repeated runtime behavior cannot be expressed or verified reliably through the existing contracts.
 
 ## `.specify/`
 
@@ -143,12 +143,13 @@ Important boundaries:
 
 ## `specs/`
 
-Each child directory is a Spec Kit feature package. The two checked-in features document the construction of this repository itself:
+Each child directory is a Spec Kit feature package. The checked-in features document the construction of this repository itself:
 
 | Feature | Purpose |
 | --- | --- |
 | `001-refinery-quality-orchestration/` | Requirements, design, reviews, contracts, and tasks for the deterministic full-refinement runtime |
 | `002-parallel-tdd-implementation/` | Requirements, design, review ledger, and tasks for the implementation skill |
+| `004-implementor-continuity/` | Requirements, design, and tasks for preflight, completion-checklist, and terminal-drive controls |
 
 A feature may contain:
 

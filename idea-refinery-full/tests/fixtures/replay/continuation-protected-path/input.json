@@ -1,0 +1,10 @@
+{
+  "checklist": [
+    {
+      "category": "specs/004/tasks.md",
+      "item_id": "protected-output",
+      "kind": "protected-path-authorization"
+    },
+    {"item_id": "tasks", "kind": "task-promotion"}
+  ]
+}

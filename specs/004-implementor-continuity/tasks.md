@@ -1,11 +1,11 @@
 # Tasks: Implementor Continuity Controls
 
-- [ ] T001 Add continuation-state and completion-checklist contracts in `idea-refinery-full/src/idea_refinery/`.
-- [ ] T002 Add unit and contract tests for terminal-drive and blocker classification in `idea-refinery-full/tests/`.
-- [ ] T003 Add replay fixtures for each pause cause in `idea-refinery-full/tests/fixtures/replay/`.
-- [ ] T004 Update `idea-refinery-implement/SKILL.md` and `references/orchestration-contract.md` with preflight, automatic correction, and terminal-drive rules.
-- [ ] T005 Update `references/implementation-state-template.md` with completion-checklist and progress fields.
-- [ ] T006 Update README, setup, and architecture documentation for continuity semantics.
+- [X] T001 Add continuation-state and completion-checklist contracts in `idea-refinery-full/src/idea_refinery/`.
+- [X] T002 Add unit and contract tests for terminal-drive and blocker classification in `idea-refinery-full/tests/`.
+- [X] T003 Add replay fixtures for each pause cause in `idea-refinery-full/tests/fixtures/replay/`.
+- [X] T004 Update `idea-refinery-implement/SKILL.md` and `references/orchestration-contract.md` with preflight, automatic correction, and terminal-drive rules.
+- [X] T005 Update `references/implementation-state-template.md` with completion-checklist and progress fields.
+- [X] T006 Update README, setup, and architecture documentation for continuity semantics.
 - [ ] T007 Run the deterministic suite, replay tests, skill validation, and `git diff --check`.
 
 ## Requirement traceability
