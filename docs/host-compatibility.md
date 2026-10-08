@@ -1,11 +1,11 @@
 # Host compatibility
 
-Idea Refinery ships the same full refinement and implementation workflows for Codex, GitHub Copilot, and Hermes. The canonical sources are `idea-refinery-full/` and `idea-refinery-implement/`; run `python3 tools/sync_host_skills.py` to regenerate the portable `.agents/skills/` distribution. Each generated folder bundles the deterministic runtime it needs (`pyproject.toml`, `src/`, `defaults/`, and `schemas/` for the full workflow), so a copied installation runs `uv run --project <copied-skill-directory> idea-refinery <command>` without a canonical checkout.
+Idea Refinery ships the same full refinement and implementation workflows for Codex, GitHub Copilot, and Hermes. The canonical sources are `refine-idea/` and `implement-refine-idea/`; run `python3 tools/sync_host_skills.py` to regenerate the portable `.agents/skills/` distribution. Each generated folder bundles the deterministic runtime it needs (`pyproject.toml`, `src/`, `defaults/`, and `schemas/` for the full workflow), so a copied installation runs `uv run --project <copied-skill-directory> idea-refinery <command>` without a canonical checkout.
 
 | Host | Discovery / install | Invocation | Spec Kit setup |
 | --- | --- | --- | --- |
-| Codex | Symlink canonical folders into `~/.codex/skills/` | `$idea-refinery-full`, then `$idea-refinery-implement` | `specify init --here --integration codex --integration-options="--skills"` |
-| GitHub Copilot | Commit `.agents/skills/idea-refinery-*` to the project, or copy both generated folders to `~/.copilot/skills/` | `/idea-refinery-full`, then `/idea-refinery-implement` | `specify init --here --integration copilot` |
+| Codex | Symlink canonical folders into `~/.codex/skills/` | `$refine-idea`, then `$implement-refine-idea` | `specify init --here --integration codex --integration-options="--skills"` |
+| GitHub Copilot | Commit `.agents/skills/refine-idea` and `.agents/skills/implement-refine-idea` to the project, or copy both generated folders to `~/.copilot/skills/` | `/refine-idea`, then `/implement-refine-idea` | `specify init --here --integration copilot` |
 | Hermes | Configure `.agents/skills/` as an external skill source, or copy each generated folder to `~/.hermes/skills/` | Invoke the matching slash skill | Preserve an existing integration; otherwise use `specify init --here --integration generic --integration-options="--commands-dir .agents/commands/"` |
 
 Complete failure-safe personal installation, update, removal, refresh, and precedence commands are in the [setup guide](../setup.md).
@@ -56,7 +56,7 @@ Only `missing-authority`, `material-decision`, and `external-state` can produce 
 
 Continuation replay checklist items record their prerequisite item IDs in `dependencies` (a JSON list; omitted means no dependencies). References must exist and be acyclic; routine work must not depend directly or transitively on final verification. The sidecar advances dependencies first and invalidates only transitive dependent evidence, preserving independent slices. Record all applicable dependencies, including those of final verification; an `IMPLEMENTATION COMPLETE` verdict requires a `final-verification` gate. Material-decision blockers remain binding even if marked `derived`, and blocked results report any item IDs completed during that drive. Scoped grants persist in `granted_authorizations` independently of gate completion, including when a dependency blocks; replay resumes need not resupply accepted grants. Authorization and validator inputs must be non-string, non-mapping collections of non-empty strings.
 
-The controller is the sole writer of `tasks.md`, `refinery-state.md`, and `implementation-state.md` on every host. Generated `.agents/skills/idea-refinery-*` folders are distributions, not alternate sources: edit canonical `idea-refinery-*` folders and run the synchronization command below.
+The controller is the sole writer of `tasks.md`, `refinery-state.md`, and `implementation-state.md` on every host. Generated `.agents/skills/refine-idea` and `.agents/skills/implement-refine-idea` folders are distributions, not alternate sources: edit canonical `refine-idea` and `implement-refine-idea` folders and run the synchronization command below.
 
 ## Update, remove, and validate
 
@@ -74,4 +74,4 @@ python3 tools/sync_host_skills.py
 python3 tools/sync_host_skills.py --check
 ```
 
-For copied Copilot or Hermes installs, replace each installed `idea-refinery-*` folder with its newly generated counterpart only after both sources validate. The [setup guide](../setup.md) provides failure-safe PowerShell and POSIX procedures. `tools/sync_host_skills.py --check` validates only the checked-in distribution. To remove an installation, delete only the copied or linked `idea-refinery-full` and `idea-refinery-implement` folders, never the repository or target feature artifacts.
+For copied Copilot or Hermes installs, replace each installed skill with its newly generated counterpart only after both sources validate. After verifying the new copies or links, remove any legacy `idea-refinery-full` and `idea-refinery-implement` entries from the same skills directory so both versions are not discoverable. The [setup guide](../setup.md) provides failure-safe PowerShell and POSIX procedures and the Codex link-upgrade commands. `tools/sync_host_skills.py --check` validates only the checked-in distribution. To remove an installation, delete only the copied or linked `refine-idea` and `implement-refine-idea` folders, never the repository or target feature artifacts.

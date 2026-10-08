@@ -1,16 +1,16 @@
 # Idea Refinery Full Architecture
 
-How `$idea-refinery-full` turns a user-approved idea into independently reviewed, repair-bounded, implementation-ready Spec Kit artifacts.
+How `$refine-idea` turns a user-approved idea into independently reviewed, repair-bounded, implementation-ready Spec Kit artifacts.
 
 ## Purpose and boundary
 
-`$idea-refinery-full` is an explicit-only refinement workflow. It produces an active Spec Kit feature containing:
+`$refine-idea` is an explicit-only refinement workflow. It produces an active Spec Kit feature containing:
 
 ```text
 spec.md + plan.md + tasks.md + refinery-state.md
 ```
 
-The workflow stops before application-code implementation. A ready handoff may point to `$idea-refinery-implement`, but the implementation skill requires a separate user invocation because it has broader mutation authority.
+The workflow stops before application-code implementation. A ready handoff may point to `$implement-refine-idea`, but the implementation skill requires a separate user invocation because it has broader mutation authority.
 
 The system has two cooperating layers:
 
@@ -78,7 +78,7 @@ Configuration precedence is:
 ```text
 invocation overrides.roles
   > repository .idea-refinery/config.yaml
-  > idea-refinery-full/defaults/config.yaml
+  > refine-idea/defaults/config.yaml
 ```
 
 The controller captures the models and reasoning efforts available in the active session. The deterministic package resolves each role against that roster and persists the complete assignment before dispatch.
@@ -169,7 +169,7 @@ BLOCKED ON DECISION
 The CLI adapter is available through:
 
 ```bash
-uv run --project idea-refinery-full idea-refinery <command>
+uv run --project refine-idea idea-refinery <command>
 ```
 
 It resolves configuration, creates and validates briefs/envelopes, builds coverage, synthesizes results, checks invalidation and repair packets, manages run state, and runs replay/readiness evaluation. It never executes a model.
@@ -178,7 +178,7 @@ Blocking gates include schemas and semantic contracts, deterministic tests, appr
 
 ## Non-goals
 
-`$idea-refinery-full` does not implement application code, access provider credentials, run hidden model clients, create issues, commit, push, open pull requests, merge, or deploy.
+`$refine-idea` does not implement application code, access provider credentials, run hidden model clients, create issues, commit, push, open pull requests, merge, or deploy.
 
 ## Related documentation
 
@@ -187,5 +187,5 @@ Blocking gates include schemas and semantic contracts, deterministic tests, appr
 - [Refinery state template](references/refinery-state-template.md)
 - [Default role configuration](defaults/config.yaml)
 - [Repository structure](../RepoStructure.md)
-- [Implementation skill architecture](../idea-refinery-implement/ARCHITECTURE.md)
+- [Implementation skill architecture](../implement-refine-idea/ARCHITECTURE.md)
 - [Quality-orchestration feature artifacts](../specs/001-refinery-quality-orchestration/plan.md)
