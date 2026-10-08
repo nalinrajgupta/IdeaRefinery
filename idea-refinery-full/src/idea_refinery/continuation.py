@@ -74,6 +74,7 @@ class ContinuationState:
     blockers: tuple[Blocker, ...] = ()
     prerequisite_resolutions: tuple[PrerequisiteResolution, ...] = ()
     terminal_verdict: str | None = None
+    granted_authorizations: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -87,6 +88,7 @@ class ContinuationResult:
 
 
 def _validate_contract(state: ContinuationState) -> None:
+    _validated_string_collection(state.granted_authorizations, field="granted_authorizations")
     if not state.checklist:
         raise ContractError(
             "completion-checklist-empty",
@@ -174,6 +176,22 @@ def _validate_contract(state: ContinuationState) -> None:
                 {"item_id": item.item_id, "dependencies": sorted(unknown_dependencies)},
             )
     _ordered_checklist(state.checklist)
+    final_verification_ids = {
+        item.item_id for item in state.checklist if item.kind == "final-verification"
+    }
+    final_dependents = _dependent_item_ids(state.checklist, final_verification_ids)
+    invalid_final_dependents = [
+        item.item_id
+        for item in state.checklist
+        if item.item_id in final_dependents
+        and 0 <= _INTERNAL_ORDER[item.kind] < _INTERNAL_ORDER["final-verification"]
+    ]
+    if invalid_final_dependents:
+        raise ContractError(
+            "completion-final-verification-dependency-invalid",
+            "routine work must not depend on final verification",
+            {"item_ids": invalid_final_dependents},
+        )
     invalid_blockers = sorted(
         str(blocker.category)
         for blocker in state.blockers
@@ -493,6 +511,19 @@ def _validated_action_results(action_results: Mapping[str, str] | None) -> dict[
     return dict(action_results)
 
 
+def _validated_string_collection(values: Collection[str], *, field: str) -> frozenset[str]:
+    if (
+        not isinstance(values, Collection)
+        or isinstance(values, (str, bytes, Mapping))
+        or any(not isinstance(value, str) or not value.strip() for value in values)
+    ):
+        raise ContractError(
+            field.replace("_", "-") + "-invalid",
+            f"{field} must be a non-string collection of non-empty strings",
+        )
+    return frozenset(values)
+
+
 def _require_nonempty_string(value: Any, *, code: str, field: str, item_index: int) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ContractError(
@@ -700,6 +731,9 @@ def continuation_state_from_document(document: dict[str, Any]) -> ContinuationSt
         blockers=tuple(blockers),
         prerequisite_resolutions=tuple(resolutions),
         terminal_verdict=terminal_verdict,
+        granted_authorizations=_validated_string_collection(
+            document.get("granted_authorizations", []), field="granted_authorizations",
+        ),
     )
 
 
@@ -783,8 +817,10 @@ def drive_terminal(
     if state.terminal_verdict is not None:
         validate_completion_checklist(state)
     results = _validated_action_results(action_results)
-    granted = frozenset(granted_authorizations)
-    validators = frozenset(available_validators)
+    granted = frozenset(state.granted_authorizations).union(
+        _validated_string_collection(granted_authorizations, field="granted_authorizations")
+    )
+    validators = _validated_string_collection(available_validators, field="available_validators")
     recorded_blockers = tuple(
         blocker for blocker in state.blockers
         if not blocker.derived or blocker.category == "material-decision"
@@ -801,6 +837,7 @@ def drive_terminal(
     )
     state = replace(
         state,
+        granted_authorizations=granted,
         blockers=recorded_blockers,
         checklist=_cleared_dependent_evidence(
             state.checklist, [item.item_id for item in state.checklist if not item.completed]

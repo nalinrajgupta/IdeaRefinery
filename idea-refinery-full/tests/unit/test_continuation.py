@@ -1241,3 +1241,104 @@ def test_fresh_action_results_can_replace_stale_dependent_evidence() -> None:
     assert result.verdict == "IMPLEMENTATION COMPLETE"
     assert result.completed_item_ids == ("task", "verify")
     assert result.state.checklist[1].evidence == "fresh suite"
+
+
+@pytest.mark.parametrize("field", ["granted_authorizations", "available_validators"])
+@pytest.mark.parametrize(
+    "value",
+    [{"protected-path:scope": False}, "protected-path:scope", b"scope", True, 7, None, [""]],
+)
+def test_authorization_inputs_reject_malformed_collections(field: str, value: object) -> None:
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("path", "protected-path-authorization", category="scope"),
+            continuation.CompletionItem("verify", "final-verification"),
+        ),
+    )
+
+    with pytest.raises(ContractError) as caught:
+        continuation.drive_terminal(state, **{field: value})
+    assert caught.value.code == field.replace("_", "-") + "-invalid"
+
+
+@pytest.mark.parametrize("value", [{"protected-path:scope": False}, "scope", True, [None], [" "]])
+def test_persisted_grants_reject_malformed_collections(value: object) -> None:
+    document = {
+        "checklist": [{"item_id": "verify", "kind": "final-verification"}],
+        "granted_authorizations": value,
+    }
+
+    with pytest.raises(ContractError) as caught:
+        continuation.continuation_state_from_document(document)
+    assert caught.value.code == "granted-authorizations-invalid"
+
+    state = continuation.ContinuationState(
+        checklist=(continuation.CompletionItem("verify", "final-verification"),),
+        granted_authorizations=value,
+    )
+    with pytest.raises(ContractError) as caught:
+        continuation.drive_terminal(state)
+    assert caught.value.code == "granted-authorizations-invalid"
+
+
+def test_grant_survives_blocked_dependency_and_replay_resume() -> None:
+    state = continuation.ContinuationState(
+        checklist=(
+            continuation.CompletionItem("validator", "validator-prerequisite", category="schema"),
+            continuation.CompletionItem(
+                "path", "protected-path-authorization", category="scope", dependencies=("validator",),
+            ),
+            continuation.CompletionItem("verify", "final-verification", dependencies=("path",)),
+        ),
+    )
+    requested = continuation.drive_terminal(state)
+    assert requested.authorization_requests == ("protected-path:scope",)
+
+    blocked = continuation.drive_terminal(
+        requested.state, granted_authorizations={"protected-path:scope"},
+    )
+    assert blocked.verdict == "BLOCKED ON VERIFICATION"
+    assert not blocked.state.checklist[1].completed
+    assert blocked.state.granted_authorizations == frozenset({"protected-path:scope"})
+    continuation.validate_completion_checklist(blocked.state)
+
+    restored = continuation.continuation_state_from_document(
+        json.loads(json.dumps(asdict(blocked.state), default=list))
+    )
+    resumed = continuation.drive_terminal(
+        restored, available_validators={"schema"}, action_results={"verify": "fresh suite"},
+    )
+    assert resumed.authorization_requests == ()
+    assert resumed.completed_item_ids == ("validator", "path", "verify")
+    assert resumed.verdict == "IMPLEMENTATION COMPLETE"
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["task", "review", "review-correction", "task-promotion", "state-recording", "convergence", "after-hook"],
+)
+@pytest.mark.parametrize("completed", [False, True])
+@pytest.mark.parametrize("transitive", [False, True])
+def test_routine_work_cannot_depend_on_final_verification(
+    kind: str, completed: bool, transitive: bool,
+) -> None:
+    checklist = (
+        continuation.CompletionItem(
+            "verify", "final-verification", completed=completed,
+            evidence="old suite" if completed else None,
+        ),
+        continuation.CompletionItem(
+            "work", kind, dependencies=("path" if transitive else "verify",),
+        ),
+    )
+    if transitive:
+        checklist += (
+            continuation.CompletionItem(
+                "path", "protected-path-authorization", category="scope", dependencies=("verify",),
+            ),
+        )
+    state = continuation.ContinuationState(checklist=checklist)
+
+    with pytest.raises(ContractError) as caught:
+        continuation.drive_terminal(state, action_results={"work": "mutation accepted"})
+    assert caught.value.code == "completion-final-verification-dependency-invalid"
