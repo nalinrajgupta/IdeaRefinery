@@ -17,7 +17,7 @@ When reviewing a pull request in this repository:
 
 Before beginning the normal review, classify the complete pull request diff against the target branch:
 
-- A specification change is any change under `specs/**`.
+- A specification change is a change under `specs/**` that modifies approved requirements, scope, architecture, contracts, or planned work. Implementation bookkeeping updates that only record task completion, run state, or validation evidence are not specification changes.
 - An implementation change is a behavior-changing change to source code, tests, workflows, tools, or generated runtime or skill files. This includes changes under `idea-refinery-full/src/**`, `idea-refinery-full/tests/**`, `idea-refinery-implement/**`, `tests/**`, `tools/**`, `.github/workflows/**`, or `.agents/skills/**`. Documentation or configuration outside `specs/**` counts only when it changes executable workflow or product behavior.
 - If the pull request contains both specification and implementation changes, raise one blocking finding that identifies representative paths from both groups and requires the work to be split into separate pull requests. Do not approve the pull request or describe it as ready to merge. This is a review policy finding; repository rules, not this instruction, determine whether GitHub technically permits the merge.
 - If the pull request contains specification changes and no implementation changes, review every requested iteration holistically. Compare the complete affected feature package at the pull request head with the target branch, not only with the previous iteration or latest pushed diff.
