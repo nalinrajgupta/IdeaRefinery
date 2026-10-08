@@ -18,7 +18,7 @@ When reviewing a pull request in this repository:
 Before beginning the normal review, classify the complete pull request diff against the target branch:
 
 - A specification change is a change under `specs/**` that modifies approved requirements, scope, architecture, contracts, or planned work. Implementation bookkeeping updates that only record task completion, run state, or validation evidence are not specification changes.
-- An implementation change is a behavior-changing change to source code, tests, workflows, tools, or generated runtime or skill files. This includes changes under `idea-refinery-full/src/**`, `idea-refinery-full/tests/**`, `idea-refinery-implement/**`, `tests/**`, `tools/**`, `.github/workflows/**`, or `.agents/skills/**`. Documentation or configuration outside `specs/**` counts only when it changes executable workflow or product behavior.
+- An implementation change is a behavior-changing change to source code, tests, workflows, tools, or generated runtime or skill files. This includes changes under `refine-idea/src/**`, `refine-idea/tests/**`, `implement-refine-idea/**`, `tests/**`, `tools/**`, `.github/workflows/**`, or `.agents/skills/**`. Documentation or configuration outside `specs/**` counts only when it changes executable workflow or product behavior.
 - If the pull request contains both specification and implementation changes, raise one blocking finding that identifies representative paths from both groups and requires the work to be split into separate pull requests. Do not approve the pull request or describe it as ready to merge. This is a review policy finding; repository rules, not this instruction, determine whether GitHub technically permits the merge.
 - If the pull request contains specification changes and no implementation changes, review every requested iteration holistically. Compare the complete affected feature package at the pull request head with the target branch, not only with the previous iteration or latest pushed diff.
 - For a specification-only review, read all relevant `spec.md`, `plan.md`, `tasks.md`, `refinery-state.md`, `implementation-state.md`, `research.md`, `data-model.md`, `quickstart.md`, contracts, and checklists together, including unchanged files needed to evaluate the change. Check internal consistency, requirement-to-task traceability, scope drift, unresolved decisions, contradictory acceptance criteria, and stale downstream artifacts.
@@ -37,19 +37,19 @@ On every requested review or re-review:
 
 Verify that every pull request preserves these boundaries:
 
-- `idea-refinery-full` may refine requirements and design artifacts but must not implement application code.
-- `idea-refinery-implement` may implement only an approved, ready handoff and must not silently change product scope or architecture.
-- The deterministic package under `idea-refinery-full/src/idea_refinery` must not discover or invoke models, read provider credentials, or call external model CLIs.
+- `refine-idea` may refine requirements and design artifacts but must not implement application code.
+- `implement-refine-idea` may implement only an approved, ready handoff and must not silently change product scope or architecture.
+- The deterministic package under `refine-idea/src/idea_refinery` must not discover or invoke models, read provider credentials, or call external model CLIs.
 - Review workers are read-only. Shared task, run, and state artifacts remain controller-owned.
 - Existing Spec Kit configuration must be preserved. Initialization or forced replacement must require explicit approval.
 - Requirement identifiers, decisions, findings, stage history, and audit evidence must remain traceable across `spec.md`, `plan.md`, `tasks.md`, `refinery-state.md`, and `implementation-state.md`.
-- Canonical skill sources live in `idea-refinery-full` and `idea-refinery-implement`. Generated copies under `.agents/skills/idea-refinery-*` must not be edited directly and must remain synchronized.
+- Canonical skill sources live in `refine-idea` and `implement-refine-idea`. Generated copies under `.agents/skills/idea-refinery-*` must not be edited directly and must remain synchronized.
 - Changes to schemas or persisted formats must account for existing artifacts and include compatibility, migration, or explicit rejection behavior.
 - Commits, pushes, pull requests, merges, deployments, destructive cleanup, and repository-structure changes require separate authorization.
 
 ## Validation expectations
 
-- Changes to the deterministic runtime should include focused tests and pass `uv run --project idea-refinery-full --extra dev pytest -q`.
+- Changes to the deterministic runtime should include focused tests and pass `uv run --project refine-idea --extra dev pytest -q`.
 - Changes affecting generated host skills should pass `python3 tools/sync_host_skills.py --check`.
 - Documentation and examples must agree on host-specific invocation: Copilot uses slash-prefixed skills, while other hosts may use different forms.
 - Confirm that changed local Markdown links, referenced files, workflow paths, and commands exist and remain accurate.

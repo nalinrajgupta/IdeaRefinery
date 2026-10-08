@@ -9,8 +9,8 @@ IdeaRefinery/
 ├── README.md                       # project entry point and quick tryout
 ├── setup.md                        # detailed local/global installation how-to
 ├── RepoStructure.md                # this repository reference
-├── idea-refinery-full/             # refinement skill and deterministic runtime
-├── idea-refinery-implement/        # parallel TDD implementation skill
+├── refine-idea/             # refinement skill and deterministic runtime
+├── implement-refine-idea/        # parallel TDD implementation skill
 ├── specs/                          # Spec Kit feature artifacts for this project
 ├── .idea-refinery/                 # optional per-repository role/config overrides
 ├── .specify/                       # Spec Kit configuration, templates, and scripts
@@ -19,16 +19,16 @@ IdeaRefinery/
 └── .github/workflows/              # deterministic runtime CI
 ```
 
-The two skill folders are intentionally separate. `idea-refinery-full/` owns refinement and stops at an implementation-ready handoff. `idea-refinery-implement/` consumes that handoff and has separate authority to edit application code and tests.
+The two skill folders are intentionally separate. `refine-idea/` owns refinement and stops at an implementation-ready handoff. `implement-refine-idea/` consumes that handoff and has separate authority to edit application code and tests.
 
 `tools/sync_host_skills.py` generates `.agents/skills/idea-refinery-*` from the canonical folders and copies their required references. GitHub Copilot discovers this standard project-skill location; Hermes can use it as an external source or receive a copy under its skill home. See [host compatibility](docs/host-compatibility.md).
 
 `.idea-refinery/config.yaml` is optional and may exist in a target repository even when it is absent from this checkout. Its role assignments override bundled defaults but remain below invocation-level overrides.
 
-## `idea-refinery-full/`
+## `refine-idea/`
 
 ```text
-idea-refinery-full/
+refine-idea/
 ├── SKILL.md
 ├── ARCHITECTURE.md
 ├── agents/
@@ -75,7 +75,7 @@ idea-refinery-full/
 
 | Path | Purpose | Typical use |
 | --- | --- | --- |
-| `SKILL.md` | Explicit-only controller workflow | Load when invoking `$idea-refinery-full` |
+| `SKILL.md` | Explicit-only controller workflow | Load when invoking `$refine-idea` |
 | `ARCHITECTURE.md` | Explanation of stages, roles, persistence, repair, and readiness | Understand why stages are separate and how data moves |
 | `agents/openai.yaml` | UI name, prompt, and implicit-invocation policy | Skill discovery metadata |
 | `references/orchestration-contract.md` | Normative finding, coverage, repair, and handoff rules | Implement or audit controller behavior |
@@ -87,10 +87,10 @@ idea-refinery-full/
 
 The Python package is not an autonomous agent runtime. It never discovers or invokes models, reads provider credentials, or calls external model CLIs. The active Codex session owns all model execution and user interaction.
 
-## `idea-refinery-implement/`
+## `implement-refine-idea/`
 
 ```text
-idea-refinery-implement/
+implement-refine-idea/
 ├── SKILL.md
 ├── ARCHITECTURE.md
 ├── agents/
@@ -108,7 +108,7 @@ idea-refinery-implement/
 | `references/orchestration-contract.md` | Normative preflight, completion checklist, worker envelopes, isolation, evidence, automatic review correction, and recovery rules | Audit or extend implementation behavior |
 | `references/implementation-state-template.md` | Resumable preflight, completion checklist, progress, wave, assignment, evidence, finding, and verification state | Create `implementation-state.md` in an active feature |
 
-This skill is instruction-backed. Continuation validation belongs to the deterministic `idea-refinery-full` sidecar because it must remain provider- and credential-independent; that sidecar validates replayable transitions only and is not a background monitor or scheduler. Add deterministic code only when repeated runtime behavior cannot be expressed or verified reliably through the existing contracts.
+This skill is instruction-backed. Continuation validation belongs to the deterministic `refine-idea` sidecar because it must remain provider- and credential-independent; that sidecar validates replayable transitions only and is not a background monitor or scheduler. Add deterministic code only when repeated runtime behavior cannot be expressed or verified reliably through the existing contracts.
 
 ## `.specify/`
 
@@ -139,7 +139,7 @@ Important boundaries:
 
 - `$speckit-analyze` is read-only.
 - `$speckit-converge` may append a convergence phase to `tasks.md` but does not implement it.
-- `$speckit-implement` supplies prerequisite, checklist, hook, and task-state conventions; `idea-refinery-implement` adds stronger isolation, TDD evidence, and independent review.
+- `$speckit-implement` supplies prerequisite, checklist, hook, and task-state conventions; `implement-refine-idea` adds stronger isolation, TDD evidence, and independent review.
 
 ## `specs/`
 
@@ -172,7 +172,7 @@ specs/<feature-id>/
 
 ## `.github/workflows/`
 
-`refinery-evals.yml` runs the deterministic Python tests for changes under `idea-refinery-full/`, Spec 001, or the workflow itself. It currently does not trigger for changes limited to `idea-refinery-implement/`, Spec 002, or top-level documentation. Validate those changes locally.
+`refinery-evals.yml` runs the deterministic Python tests for changes under `refine-idea/`, Spec 001, or the workflow itself. It currently does not trigger for changes limited to `implement-refine-idea/`, Spec 002, or top-level documentation. Validate those changes locally.
 
 ## Source, generated artifacts, and runtime state
 
@@ -189,12 +189,12 @@ specs/<feature-id>/
 
 | Goal | Entry point | Files involved |
 | --- | --- | --- |
-| Turn a new idea into an implementation-ready contract | `$idea-refinery-full <idea>` | Target repository `.specify/` and new/active `specs/<feature-id>/` |
-| Resume a refinement run | `$idea-refinery-full` with the same active feature | `refinery-state.md` and `runs/<run-id>/` |
-| Implement a ready handoff | `$idea-refinery-implement` | Active spec/plan/tasks/state plus target application code/tests |
-| Test the deterministic support package | `uv run --project idea-refinery-full --extra dev pytest -q` | `src/idea_refinery/`, schemas, defaults, and tests |
-| Inspect deterministic CLI commands | `uv run --project idea-refinery-full idea-refinery --help` | `src/idea_refinery/cli.py` |
-| Validate the implementation skill | Skill Creator validator and Spec 002 quickstart | `idea-refinery-implement/`, `specs/002-*/quickstart.md` |
+| Turn a new idea into an implementation-ready contract | `$refine-idea <idea>` | Target repository `.specify/` and new/active `specs/<feature-id>/` |
+| Resume a refinement run | `$refine-idea` with the same active feature | `refinery-state.md` and `runs/<run-id>/` |
+| Implement a ready handoff | `$implement-refine-idea` | Active spec/plan/tasks/state plus target application code/tests |
+| Test the deterministic support package | `uv run --project refine-idea --extra dev pytest -q` | `src/idea_refinery/`, schemas, defaults, and tests |
+| Inspect deterministic CLI commands | `uv run --project refine-idea idea-refinery --help` | `src/idea_refinery/cli.py` |
+| Validate the implementation skill | Skill Creator validator and Spec 002 quickstart | `implement-refine-idea/`, `specs/002-*/quickstart.md` |
 | Review before landing | Optional gstack `$review` after implementation verification | Final branch diff; separate user authorization |
 | Initialize Spec Kit in a target repository | `specify init --here --integration codex --integration-options="--skills"` | Adds `.specify/` and repository-local Spec Kit skills after approval |
 
@@ -203,8 +203,8 @@ specs/<feature-id>/
 The repository folders are the source of truth. Global installation uses symlinks:
 
 ```text
-~/.codex/skills/idea-refinery-full      -> <checkout>/idea-refinery-full
-~/.codex/skills/idea-refinery-implement -> <checkout>/idea-refinery-implement
+~/.codex/skills/refine-idea      -> <checkout>/refine-idea
+~/.codex/skills/implement-refine-idea -> <checkout>/implement-refine-idea
 ```
 
 This avoids duplicated skill copies. New Codex sessions read the linked checkout; existing sessions may need restarting after source or link changes. See [setup.md](setup.md) for exact commands.
@@ -213,5 +213,5 @@ This avoids duplicated skill copies. New Codex sessions read the linked checkout
 
 - [Project overview and tutorials](README.md)
 - [Detailed setup and installation](setup.md)
-- [Full refinement architecture](idea-refinery-full/ARCHITECTURE.md)
-- [Implementation architecture](idea-refinery-implement/ARCHITECTURE.md)
+- [Full refinement architecture](refine-idea/ARCHITECTURE.md)
+- [Implementation architecture](implement-refine-idea/ARCHITECTURE.md)

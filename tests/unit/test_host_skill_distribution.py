@@ -10,7 +10,8 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SYNC_SCRIPT = REPOSITORY_ROOT / "tools" / "sync_host_skills.py"
-SKILLS = ("idea-refinery-full", "idea-refinery-implement")
+SKILLS = ("refine-idea", "implement-refine-idea")
+LEGACY_SKILLS = ("idea-refinery-full", "idea-refinery-implement")
 
 
 def read_repository_text(*parts: str) -> str:
@@ -65,18 +66,27 @@ def test_host_distributions_are_self_contained_and_preserve_safety_contract() ->
         for phrase in required_phrases:
             assert phrase in canonical
 
+    for skill_name in LEGACY_SKILLS:
+        assert not (REPOSITORY_ROOT / ".agents" / "skills" / skill_name).exists()
+
 
 def test_workflow_contracts_and_host_documentation_are_present() -> None:
-    full = read_repository_text("idea-refinery-full", "SKILL.md")
-    implementation = read_repository_text("idea-refinery-implement", "SKILL.md")
+    full = read_repository_text("refine-idea", "SKILL.md")
+    implementation = read_repository_text("implement-refine-idea", "SKILL.md")
+    full_metadata = read_repository_text("refine-idea", "agents", "openai.yaml")
+    implementation_metadata = read_repository_text(
+        "implement-refine-idea", "agents", "openai.yaml"
+    )
     documentation = read_repository_text("docs", "host-compatibility.md")
 
-    assert full.startswith("---\nname: idea-refinery-full\n")
+    assert full.startswith("---\nname: refine-idea\n")
+    assert 'display_name: "RefineIdea"' in full_metadata
     assert_contains_all(
         full,
         ("explicit-only workflow", "Do not implement application code", "READY FOR IMPLEMENTATION"),
     )
-    assert implementation.startswith("---\nname: idea-refinery-implement\n")
+    assert implementation.startswith("---\nname: implement-refine-idea\n")
+    assert 'display_name: "implementRefineIdea"' in implementation_metadata
     assert_contains_all(
         implementation,
         (
@@ -110,10 +120,10 @@ def test_copilot_readme_has_first_class_quick_start() -> None:
 
     assert_contains_all(
         overview,
-        ("GitHub Copilot", "`idea-refinery-full`", "`idea-refinery-implement`", "host-specific"),
+        ("GitHub Copilot", "`refine-idea`", "`implement-refine-idea`", "host-specific"),
     )
-    assert "$idea-refinery-full" not in lifecycle
-    assert "$idea-refinery-implement" not in lifecycle
+    assert "$refine-idea" not in lifecycle
+    assert "$implement-refine-idea" not in lifecycle
     assert_contains_all(
         prerequisites,
         ("GitHub Copilot CLI", "specify init --here --integration copilot", "Preserve"),
@@ -122,22 +132,22 @@ def test_copilot_readme_has_first_class_quick_start() -> None:
         quick_start,
         (
             "## GitHub Copilot quick start",
-            ".agents/skills/idea-refinery-full",
-            ".agents/skills/idea-refinery-implement",
-            "/idea-refinery-full <idea>",
+            ".agents/skills/refine-idea",
+            ".agents/skills/implement-refine-idea",
+            "/refine-idea <idea>",
             "/skills reload",
             "spec.md",
             "plan.md",
             "tasks.md",
             "refinery-state.md",
             "READY FOR IMPLEMENTATION",
-            "/idea-refinery-implement",
+            "/implement-refine-idea",
             "dollar-prefixed",
             "[Setup and tryout](setup.md)",
             "[Host compatibility and installation](docs/host-compatibility.md)",
         ),
     )
-    assert "```text\n/idea-refinery-implement\n```" in quick_start
+    assert "```text\n/implement-refine-idea\n```" in quick_start
     assert_contains_all(
         troubleshooting,
         (
@@ -167,7 +177,7 @@ def test_copilot_setup_documents_safe_complete_lifecycle() -> None:
             "### Personal installation on Windows PowerShell",
             "### Personal installation on POSIX shells",
             ".agents\\skills",
-            ".agents/skills/idea-refinery-full",
+            ".agents/skills/refine-idea",
             ".copilot\\skills",
             "~/.copilot/skills",
             "Test-Path",
@@ -183,16 +193,16 @@ def test_copilot_setup_documents_safe_complete_lifecycle() -> None:
             "/skills",
             "project-local",
             "personal",
-            "/idea-refinery-full <idea>",
-            "/idea-refinery-implement",
+            "/refine-idea <idea>",
+            "/implement-refine-idea",
         ),
     )
     assert powershell.count('$TargetRoot = Join-Path $HOME ".copilot\\skills"') >= 3
-    assert powershell.count('$Skills = @("idea-refinery-full", "idea-refinery-implement")') >= 3
+    assert powershell.count('$Skills = @("refine-idea", "implement-refine-idea")') >= 3
     assert powershell.count("function Get-TreeManifest") >= 2
     assert posix.count('REFINERY_REPO="/absolute/path/to/IdeaRefinery"') >= 2
     assert posix.count('SOURCE_ROOT="$REFINERY_REPO/.agents/skills"') >= 2
-    assert posix.count('SKILLS="idea-refinery-full idea-refinery-implement"') >= 2
+    assert posix.count('SKILLS="refine-idea implement-refine-idea"') >= 2
     assert posix.index('test -f "$SOURCE_ROOT/$skill/SKILL.md"') < posix.index("STAGING_ROOT=")
     assert "[host compatibility](docs/host-compatibility.md)" in setup
 
@@ -234,7 +244,7 @@ def test_copilot_docs_preserve_spec_kit_and_label_shells() -> None:
 
 
 def test_implementation_preflight_supports_bash_and_powershell() -> None:
-    implementation = read_repository_text("idea-refinery-implement", "SKILL.md")
+    implementation = read_repository_text("implement-refine-idea", "SKILL.md")
 
     assert_contains_all(
         implementation,
@@ -263,3 +273,14 @@ def test_missing_relative_reference_is_rejected(tmp_path: Path) -> None:
         assert "missing local reference" in str(error)
     else:
         raise AssertionError("missing reference was accepted")
+
+
+def test_legacy_host_skill_distributions_are_removed(tmp_path: Path) -> None:
+    module = load_sync_module()
+    legacy = tmp_path / "idea-refinery-full"
+    legacy.mkdir()
+    (legacy / "SKILL.md").write_text("legacy", encoding="utf-8")
+
+    module.remove_legacy_distributions(tmp_path)
+
+    assert not legacy.exists()

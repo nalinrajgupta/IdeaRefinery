@@ -1,11 +1,11 @@
 # Host compatibility
 
-Idea Refinery ships the same full refinement and implementation workflows for Codex, GitHub Copilot, and Hermes. The canonical sources are `idea-refinery-full/` and `idea-refinery-implement/`; run `python3 tools/sync_host_skills.py` to regenerate the portable `.agents/skills/` distribution. Each generated folder bundles the deterministic runtime it needs (`pyproject.toml`, `src/`, `defaults/`, and `schemas/` for the full workflow), so a copied installation runs `uv run --project <copied-skill-directory> idea-refinery <command>` without a canonical checkout.
+Idea Refinery ships the same full refinement and implementation workflows for Codex, GitHub Copilot, and Hermes. The canonical sources are `refine-idea/` and `implement-refine-idea/`; run `python3 tools/sync_host_skills.py` to regenerate the portable `.agents/skills/` distribution. Each generated folder bundles the deterministic runtime it needs (`pyproject.toml`, `src/`, `defaults/`, and `schemas/` for the full workflow), so a copied installation runs `uv run --project <copied-skill-directory> idea-refinery <command>` without a canonical checkout.
 
 | Host | Discovery / install | Invocation | Spec Kit setup |
 | --- | --- | --- | --- |
-| Codex | Symlink canonical folders into `~/.codex/skills/` | `$idea-refinery-full`, then `$idea-refinery-implement` | `specify init --here --integration codex --integration-options="--skills"` |
-| GitHub Copilot | Commit `.agents/skills/idea-refinery-*` to the project, or copy both generated folders to `~/.copilot/skills/` | `/idea-refinery-full`, then `/idea-refinery-implement` | `specify init --here --integration copilot` |
+| Codex | Symlink canonical folders into `~/.codex/skills/` | `$refine-idea`, then `$implement-refine-idea` | `specify init --here --integration codex --integration-options="--skills"` |
+| GitHub Copilot | Commit `.agents/skills/idea-refinery-*` to the project, or copy both generated folders to `~/.copilot/skills/` | `/refine-idea`, then `/implement-refine-idea` | `specify init --here --integration copilot` |
 | Hermes | Configure `.agents/skills/` as an external skill source, or copy each generated folder to `~/.hermes/skills/` | Invoke the matching slash skill | Preserve an existing integration; otherwise use `specify init --here --integration generic --integration-options="--commands-dir .agents/commands/"` |
 
 Complete failure-safe personal installation, update, removal, refresh, and precedence commands are in the [setup guide](../setup.md).
@@ -74,4 +74,4 @@ python3 tools/sync_host_skills.py
 python3 tools/sync_host_skills.py --check
 ```
 
-For copied Copilot or Hermes installs, replace each installed `idea-refinery-*` folder with its newly generated counterpart only after both sources validate. The [setup guide](../setup.md) provides failure-safe PowerShell and POSIX procedures. `tools/sync_host_skills.py --check` validates only the checked-in distribution. To remove an installation, delete only the copied or linked `idea-refinery-full` and `idea-refinery-implement` folders, never the repository or target feature artifacts.
+For copied Copilot or Hermes installs, replace each installed `idea-refinery-*` folder with its newly generated counterpart only after both sources validate. The [setup guide](../setup.md) provides failure-safe PowerShell and POSIX procedures. `tools/sync_host_skills.py --check` validates only the checked-in distribution. To remove an installation, delete only the copied or linked `refine-idea` and `implement-refine-idea` folders, never the repository or target feature artifacts.

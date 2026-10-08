@@ -37,8 +37,8 @@ Copilot personal skills live under `~/.copilot/skills` (`$HOME\.copilot\skills` 
 This repository checks in both generated project-local skills:
 
 ```text
-.agents/skills/idea-refinery-full
-.agents/skills/idea-refinery-implement
+.agents/skills/refine-idea
+.agents/skills/implement-refine-idea
 ```
 
 To install them into another project, copy both generated folders to that project's `.agents/skills` directory and commit them with the project if team-wide discovery is desired. Do not copy only `SKILL.md`; the full skill bundles its required runtime and references.
@@ -54,13 +54,13 @@ Use `/skills` to inspect the loaded skills and their locations. When project-loc
 Invoke refinement:
 
 ```text
-/idea-refinery-full <idea>
+/refine-idea <idea>
 ```
 
 After the workflow returns `READY FOR IMPLEMENTATION`, authorize implementation separately:
 
 ```text
-/idea-refinery-implement
+/implement-refine-idea
 ```
 
 The generated descriptions retain dollar-prefixed explicit-invocation wording shared with other hosts. GitHub Copilot CLI commands use the slash-prefixed forms above.
@@ -73,7 +73,7 @@ Set the checkout path, then stage and verify both generated skills before replac
 $RefineryRepo = "C:\absolute\path\to\IdeaRefinery"
 $SourceRoot = Join-Path $RefineryRepo ".agents\skills"
 $TargetRoot = Join-Path $HOME ".copilot\skills"
-$Skills = @("idea-refinery-full", "idea-refinery-implement")
+$Skills = @("refine-idea", "implement-refine-idea")
 $RunId = [Guid]::NewGuid().ToString("N")
 $StagingRoot = Join-Path $TargetRoot ".idea-refinery-staging-$RunId"
 $BackupRoot = Join-Path $TargetRoot ".idea-refinery-backup-$RunId"
@@ -163,7 +163,7 @@ Verify the installed trees:
 $RefineryRepo = "C:\absolute\path\to\IdeaRefinery"
 $SourceRoot = Join-Path $RefineryRepo ".agents\skills"
 $TargetRoot = Join-Path $HOME ".copilot\skills"
-$Skills = @("idea-refinery-full", "idea-refinery-implement")
+$Skills = @("refine-idea", "implement-refine-idea")
 
 function Get-TreeManifest([string]$Root) {
     Get-ChildItem -LiteralPath $Root -File -Recurse |
@@ -189,7 +189,7 @@ Remove only the two personal skills; missing folders are treated as already remo
 
 ```powershell
 $TargetRoot = Join-Path $HOME ".copilot\skills"
-$Skills = @("idea-refinery-full", "idea-refinery-implement")
+$Skills = @("refine-idea", "implement-refine-idea")
 
 foreach ($Skill in $Skills) {
     $Target = Join-Path $TargetRoot $Skill
@@ -210,7 +210,7 @@ set -eu
 REFINERY_REPO="/absolute/path/to/IdeaRefinery"
 SOURCE_ROOT="$REFINERY_REPO/.agents/skills"
 TARGET_ROOT="$HOME/.copilot/skills"
-SKILLS="idea-refinery-full idea-refinery-implement"
+SKILLS="refine-idea implement-refine-idea"
 
 for skill in $SKILLS; do
   test -f "$SOURCE_ROOT/$skill/SKILL.md" ||
@@ -288,7 +288,7 @@ Verify exact copies:
 REFINERY_REPO="/absolute/path/to/IdeaRefinery"
 SOURCE_ROOT="$REFINERY_REPO/.agents/skills"
 TARGET_ROOT="$HOME/.copilot/skills"
-SKILLS="idea-refinery-full idea-refinery-implement"
+SKILLS="refine-idea implement-refine-idea"
 
 for skill in $SKILLS; do
   diff -qr "$SOURCE_ROOT/$skill" "$TARGET_ROOT/$skill"
@@ -300,8 +300,8 @@ Remove only the two personal skills; `rm -rf --` is scoped to these resolved lit
 ```bash
 TARGET_ROOT="$HOME/.copilot/skills"
 rm -rf -- \
-  "$TARGET_ROOT/idea-refinery-full" \
-  "$TARGET_ROOT/idea-refinery-implement"
+  "$TARGET_ROOT/refine-idea" \
+  "$TARGET_ROOT/implement-refine-idea"
 ```
 
 Run `/skills reload` after install, update, or removal. Use `/skills` to inspect whether a project-local or personal copy is active.
@@ -314,10 +314,10 @@ Start Codex in the target repository and load the checkout's canonical skill dir
 
 ```bash
 codex --cd /absolute/path/to/target-repository \
-  "Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-full/SKILL.md. Refine this idea: <describe your idea>"
+  "Read and follow /absolute/path/to/IdeaRefinery/refine-idea/SKILL.md. Refine this idea: <describe your idea>"
 ```
 
-Do not rely on the `$idea-refinery-full` name inside this session unless the skill is already registered globally. The explicit file instruction is the invocation.
+Do not rely on the `$refine-idea` name inside this session unless the skill is already registered globally. The explicit file instruction is the invocation.
 
 The workflow should:
 
@@ -327,13 +327,13 @@ The workflow should:
 4. Produce `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md` under the active feature directory.
 5. Finish with a readiness verdict.
 
-## Try `$idea-refinery-implement` without global installation
+## Try `$implement-refine-idea` without global installation
 
 Use a target repository whose active feature came from Idea Refinery and is ready:
 
 ```bash
 codex --cd /absolute/path/to/target-repository \
-  "Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-implement/SKILL.md. Implement the active ready Idea Refinery feature."
+  "Read and follow /absolute/path/to/IdeaRefinery/implement-refine-idea/SKILL.md. Implement the active ready Idea Refinery feature."
 ```
 
 The feature must contain `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md`. A ready summary does not override an open material decision or unresolved high-severity finding.
@@ -359,7 +359,7 @@ For a fixture-based test, use [the implementation quickstart](specs/002-parallel
 Start with the direct-file full-refinement command. Once the workflow returns a ready verdict, send a separate message to authorize implementation:
 
 ```text
-Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-implement/SKILL.md.
+Read and follow /absolute/path/to/IdeaRefinery/implement-refine-idea/SKILL.md.
 Implement the active ready Idea Refinery feature.
 ```
 
@@ -368,10 +368,10 @@ Implement the active ready Idea Refinery feature.
 ```bash
 REFINERY_REPO="/absolute/path/to/IdeaRefinery"
 mkdir -p ~/.codex/skills
-ln -sfn "$REFINERY_REPO/idea-refinery-full" \
-  ~/.codex/skills/idea-refinery-full
-ln -sfn "$REFINERY_REPO/idea-refinery-implement" \
-  ~/.codex/skills/idea-refinery-implement
+ln -sfn "$REFINERY_REPO/refine-idea" \
+  ~/.codex/skills/refine-idea
+ln -sfn "$REFINERY_REPO/implement-refine-idea" \
+  ~/.codex/skills/implement-refine-idea
 ```
 
 Verify both links with `readlink`, then start a new Codex session. Updating the checkout updates the linked skills. Remove only the two links to uninstall.
@@ -388,12 +388,12 @@ python3 tools/sync_host_skills.py --check
 Run the deterministic support-runtime tests:
 
 ```bash
-uv run --project idea-refinery-full --extra dev pytest -q
+uv run --project refine-idea --extra dev pytest -q
 ```
 
 ```powershell
 python tools\sync_host_skills.py --check
-uv run --project idea-refinery-full --extra dev python -m pytest tests\unit\test_host_skill_distribution.py
+uv run --project refine-idea --extra dev python -m pytest tests\unit\test_host_skill_distribution.py
 ```
 
 See [host compatibility](docs/host-compatibility.md) for the capability matrix, integration preservation rules, and generated-distribution ownership.
@@ -435,5 +435,5 @@ This changes composition, not required behavior. The workflow records `compositi
 - [Project overview](README.md)
 - [Host compatibility](docs/host-compatibility.md)
 - [Repository structure](RepoStructure.md)
-- [Full refinement architecture](idea-refinery-full/ARCHITECTURE.md)
-- [Implementation architecture](idea-refinery-implement/ARCHITECTURE.md)
+- [Full refinement architecture](refine-idea/ARCHITECTURE.md)
+- [Implementation architecture](implement-refine-idea/ARCHITECTURE.md)
