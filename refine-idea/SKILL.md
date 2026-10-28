@@ -1,10 +1,9 @@
 ---
-name: idea-refinery-full
-description: Orchestrate Superpowers brainstorming, gstack CEO and engineering reviews, and Spec Kit clarification and analysis to turn an idea into implementation-ready spec, plan, and tasks. Use only when explicitly invoked as $idea-refinery-full.
+name: refine-idea
+description: Orchestrate Superpowers brainstorming, gstack CEO and engineering reviews, and Spec Kit clarification and analysis to turn an idea into implementation-ready spec, plan, and tasks. Use only when explicitly invoked as $refine-idea.
 ---
-<!-- Generated from idea-refinery-full/SKILL.md; do not edit this copy. -->
 
-# Idea Refinery Full
+# RefineIdea
 
 Use this explicit-only workflow when the user wants the complete, artifact-backed refinement pipeline, not a lightweight in-chat spec. It uses the installed Superpowers, gstack, and Spec Kit skills as distinct stages.
 
@@ -18,7 +17,7 @@ With no overrides, select the first available candidate in each ordered list: CE
 
 Users may supply a versioned `overrides.roles` block. Precedence is invocation override, repository `.idea-refinery/config.yaml`, then bundled defaults. Capture and persist the complete resolved assignment before dispatch and revalidate it at dispatch. An explicit unavailable override fails unless it supplies its own fallbacks. If an effort is unsupported, select the highest supported effort not exceeding it and record the adjustment.
 
-The deterministic adapter can be exercised with `uv run --project <skill-directory> idea-refinery <command>`, where `<skill-directory>` is the canonical `idea-refinery-full/` checkout or a copied installation, which bundles the same `pyproject.toml`, `src/`, `defaults/`, and `schemas/`. Its roster input is a controller-captured JSON snapshot, not a provider-discovery mechanism.
+The deterministic adapter can be exercised with `uv run --project <skill-directory> idea-refinery <command>`, where `<skill-directory>` is the canonical `refine-idea/` checkout or a copied installation, which bundles the same `pyproject.toml`, `src/`, `defaults/`, and `schemas/`. Its roster input is a controller-captured JSON snapshot, not a provider-discovery mechanism.
 
 ## Required setup
 
@@ -90,7 +89,7 @@ Blocking quality gates are schema/semantic contracts, deterministic tests, appro
 
 Deliver the required report and verify the final readiness gate in the orchestration contract. Do not implement application code in this workflow.
 
-When the verdict is ready, identify `$idea-refinery-implement` as the separate opt-in implementation workflow if it is available. Do not invoke it automatically; its application-code mutation authority requires a separate user request.
+When the verdict is ready, identify `$implement-refine-idea` as the separate opt-in implementation workflow if it is available. Do not invoke it automatically; its application-code mutation authority requires a separate user request.
 
 ## Safety and scope
 

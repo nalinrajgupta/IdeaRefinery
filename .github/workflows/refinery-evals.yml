@@ -3,8 +3,8 @@ name: Idea Refinery deterministic evals
 on:
   push:
     paths:
-      - "idea-refinery-full/**"
-      - "idea-refinery-implement/**"
+      - "refine-idea/**"
+      - "implement-refine-idea/**"
       - "specs/001-refinery-quality-orchestration/**"
       - ".agents/skills/**"
       - "tools/**"
@@ -15,8 +15,8 @@ on:
       - ".github/workflows/refinery-evals.yml"
   pull_request:
     paths:
-      - "idea-refinery-full/**"
-      - "idea-refinery-implement/**"
+      - "refine-idea/**"
+      - "implement-refine-idea/**"
       - "specs/001-refinery-quality-orchestration/**"
       - ".agents/skills/**"
       - "tools/**"
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: idea-refinery-full
+        working-directory: refine-idea
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -49,4 +49,4 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           version: latest
-      - run: uv run --project idea-refinery-full --extra dev python -m pytest tests/unit/test_host_skill_distribution.py
+      - run: uv run --project refine-idea --extra dev python -m pytest tests/unit/test_host_skill_distribution.py

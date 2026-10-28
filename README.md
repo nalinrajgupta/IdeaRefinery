@@ -6,8 +6,8 @@ The repository provides two explicit-only workflows for Codex, GitHub Copilot, a
 
 | Skill | Use it when | Result |
 | --- | --- | --- |
-| `idea-refinery-full` | You need to discover, review, clarify, plan, and task an idea | A ready or decision-blocked Spec Kit feature containing `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md` |
-| `idea-refinery-implement` | The active Idea Refinery feature is ready and you want application changes | Reviewed code and tests, completed task state, `implementation-state.md`, convergence, and fresh verification evidence |
+| `refine-idea` | You need to discover, review, clarify, plan, and task an idea | A ready or decision-blocked Spec Kit feature containing `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md` |
+| `implement-refine-idea` | The active Idea Refinery feature is ready and you want application changes | Reviewed code and tests, completed task state, `implementation-state.md`, convergence, and fresh verification evidence |
 
 The split is an authority boundary. Refinement may create and revise design artifacts but never application code. Implementation may change the code and tests required by the approved handoff but never silently change product scope or architecture.
 
@@ -17,7 +17,7 @@ Invocation syntax is host-specific: GitHub Copilot uses slash-prefixed skills, C
 
 ```text
 Rough idea
-  -> idea-refinery-full
+  -> refine-idea
        -> repository and Spec Kit setup
        -> Superpowers brainstorming
        -> Spec v1
@@ -28,7 +28,7 @@ Rough idea
        -> consistency analysis and bounded repair
        -> READY FOR IMPLEMENTATION
   -> separate user invocation
-  -> idea-refinery-implement
+  -> implement-refine-idea
        -> readiness, traceability, protected-path, and validator preflight
        -> explicit completion checklist and foreground terminal-drive loop
        -> dependency-safe task waves
@@ -42,8 +42,8 @@ Rough idea
 
 Use the architecture documents for the exact stage boundaries:
 
-- [Full refinement architecture](idea-refinery-full/ARCHITECTURE.md)
-- [Implementation architecture](idea-refinery-implement/ARCHITECTURE.md)
+- [Full refinement architecture](refine-idea/ARCHITECTURE.md)
+- [Implementation architecture](implement-refine-idea/ARCHITECTURE.md)
 - [Repository and file structure](RepoStructure.md)
 - [Host compatibility and installation](docs/host-compatibility.md)
 
@@ -56,7 +56,7 @@ For refinement:
 - gstack `plan-ceo-review` and `plan-eng-review`
 - Spec Kit's `specify` CLI and repository-local `speckit-*` skills
 
-If the target repository is not a Spec Kit project, `idea-refinery-full` explains the host-specific initialization and requests approval before running it. For GitHub Copilot:
+If the target repository is not a Spec Kit project, `refine-idea` explains the host-specific initialization and requests approval before running it. For GitHub Copilot:
 
 ```bash
 specify init --here --integration copilot
@@ -77,8 +77,8 @@ The implementation skill prefers Superpowers subagent, TDD, debugging, review, a
 
 This checkout already contains the repository-local skills:
 
-- `.agents/skills/idea-refinery-full`
-- `.agents/skills/idea-refinery-implement`
+- `.agents/skills/refine-idea`
+- `.agents/skills/implement-refine-idea`
 
 Open GitHub Copilot CLI in the repository and refresh discovery if the skills were added after the session started:
 
@@ -89,7 +89,7 @@ Open GitHub Copilot CLI in the repository and refresh discovery if the skills we
 Start refinement with:
 
 ```text
-/idea-refinery-full <idea>
+/refine-idea <idea>
 ```
 
 A successful refinement creates `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md` under the active feature directory and finishes with `READY FOR IMPLEMENTATION`, a degraded readiness verdict, or a decision blocker.
@@ -97,7 +97,7 @@ A successful refinement creates `spec.md`, `plan.md`, `tasks.md`, and `refinery-
 Implementation requires a separate authorization:
 
 ```text
-/idea-refinery-implement
+/implement-refine-idea
 ```
 
 For personal installation across repositories, safe update/removal commands, project-local precedence, and Windows PowerShell or POSIX shell instructions, follow [Setup and tryout](setup.md). Cross-host capability and Spec Kit preservation rules remain in [Host compatibility and installation](docs/host-compatibility.md).
@@ -110,10 +110,10 @@ You can test the checkout without changing global skill registration. Start Code
 
 ```bash
 codex --cd /absolute/path/to/target-repository \
-  "Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-full/SKILL.md. Refine this idea: <describe your idea>"
+  "Read and follow /absolute/path/to/IdeaRefinery/refine-idea/SKILL.md. Refine this idea: <describe your idea>"
 ```
 
-This direct-file form does not depend on `$idea-refinery-full` already being globally discoverable. The workflow first inspects the target repository, then asks for approval before initialization or artifact writes.
+This direct-file form does not depend on `$refine-idea` already being globally discoverable. The workflow first inspects the target repository, then asks for approval before initialization or artifact writes.
 
 Expected result:
 
@@ -133,7 +133,7 @@ Starting implementation in a fresh session reduces stale context and makes the a
 
 ```bash
 codex --cd /absolute/path/to/target-repository \
-  "Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-implement/SKILL.md. Implement the active ready Idea Refinery feature."
+  "Read and follow /absolute/path/to/IdeaRefinery/implement-refine-idea/SKILL.md. Implement the active ready Idea Refinery feature."
 ```
 
 The skill validates the handoff again, performs protected-path and validator preflight before mutable work, records one explicit completion checklist, schedules at most three safely isolated workers, obtains independent review, automatically corrects objective in-scope findings, runs up to two convergence implementation cycles, and performs fresh final verification. Progress messages do not end the invocation while authorized checklist work remains.
@@ -145,7 +145,7 @@ To test the implementation skill itself against a fixture rather than a real app
 Start with the refinement command above. After it returns `READY FOR IMPLEMENTATION`, explicitly authorize the second skill in a new message:
 
 ```text
-Read and follow /absolute/path/to/IdeaRefinery/idea-refinery-implement/SKILL.md.
+Read and follow /absolute/path/to/IdeaRefinery/implement-refine-idea/SKILL.md.
 Implement the active ready feature.
 ```
 
@@ -158,29 +158,29 @@ Global registration lets new Codex sessions invoke the skills by name:
 ```bash
 REFINERY_REPO="/absolute/path/to/IdeaRefinery"
 mkdir -p ~/.codex/skills
-ln -sfn "$REFINERY_REPO/idea-refinery-full" \
-  ~/.codex/skills/idea-refinery-full
-ln -sfn "$REFINERY_REPO/idea-refinery-implement" \
-  ~/.codex/skills/idea-refinery-implement
+ln -sfn "$REFINERY_REPO/refine-idea" \
+  ~/.codex/skills/refine-idea
+ln -sfn "$REFINERY_REPO/implement-refine-idea" \
+  ~/.codex/skills/implement-refine-idea
 ```
 
 Verify both links:
 
 ```bash
-readlink ~/.codex/skills/idea-refinery-full
-readlink ~/.codex/skills/idea-refinery-implement
+readlink ~/.codex/skills/refine-idea
+readlink ~/.codex/skills/implement-refine-idea
 ```
 
 Start a new Codex session in the target project, then invoke:
 
 ```text
-$idea-refinery-full <describe your idea>
+$refine-idea <describe your idea>
 ```
 
 After the resulting handoff is ready, invoke separately:
 
 ```text
-$idea-refinery-implement
+$implement-refine-idea
 ```
 
 Existing Codex sessions may need restarting after skill links or instructions change. See [setup.md](setup.md) for updating, removing, and troubleshooting registrations.
@@ -189,28 +189,28 @@ Existing Codex sessions may need restarting after skill links or instructions ch
 
 ### Refinement
 
-`$idea-refinery-full` combines an active-session controller with a deterministic Python sidecar. The controller owns dialogue, model roster capture, delegation, and all shared writes. The package under `idea-refinery-full/src/idea_refinery/` owns versioned configuration, schemas, hashes, immutable run objects, coverage, repair checkpoints, readiness, and offline evaluation. It never invokes provider APIs or model CLIs.
+`$refine-idea` combines an active-session controller with a deterministic Python sidecar. The controller owns dialogue, model roster capture, delegation, and all shared writes. The package under `refine-idea/src/idea_refinery/` owns versioned configuration, schemas, hashes, immutable run objects, coverage, repair checkpoints, readiness, and offline evaluation. It never invokes provider APIs or model CLIs.
 
-The default reviewer roles are CEO `gpt-5.5`, Product `gpt-5.6-terra`, Architect `gpt-5.6-sol`, Eval `gpt-5.6-luna`, and Baseline `gpt-5.4`, with ordered fallbacks and effort rules in [the bundled configuration](idea-refinery-full/defaults/config.yaml). Invocation overrides take precedence over repository config, which takes precedence over bundled defaults.
+The default reviewer roles are CEO `gpt-5.5`, Product `gpt-5.6-terra`, Architect `gpt-5.6-sol`, Eval `gpt-5.6-luna`, and Baseline `gpt-5.4`, with ordered fallbacks and effort rules in [the bundled configuration](refine-idea/defaults/config.yaml). Invocation overrides take precedence over repository config, which takes precedence over bundled defaults.
 
 ### Implementation
 
-`$idea-refinery-implement` keeps the controller as the only writer of shared task and state artifacts. It performs preflight for protected output paths and validator prerequisites before mutable work, asks at most once per required authority category, and drives one explicit completion checklist through task execution, review, objective correction, promotion, convergence, state recording, and final evidence. It derives conservative write sets, requires host-enforced isolation for parallel edits, caps waves at three workers, binds implementation to recorded baseline/red/green/refactor evidence, and requires a different read-only reviewer before task promotion. `$speckit-converge` detects omitted work after the planned tasks complete; gstack `$review` remains an optional pre-landing concern.
+`$implement-refine-idea` keeps the controller as the only writer of shared task and state artifacts. It performs preflight for protected output paths and validator prerequisites before mutable work, asks at most once per required authority category, and drives one explicit completion checklist through task execution, review, objective correction, promotion, convergence, state recording, and final evidence. It derives conservative write sets, requires host-enforced isolation for parallel edits, caps waves at three workers, binds implementation to recorded baseline/red/green/refactor evidence, and requires a different read-only reviewer before task promotion. `$speckit-converge` detects omitted work after the planned tasks complete; gstack `$review` remains an optional pre-landing concern.
 
-The continuation validator in `idea-refinery-full` is deterministic and provider- and credential-independent. It validates checklist transitions and replay evidence only; it does not call model providers or act as a background monitor/scheduler.
+The continuation validator in `refine-idea` is deterministic and provider- and credential-independent. It validates checklist transitions and replay evidence only; it does not call model providers or act as a background monitor/scheduler.
 
 ## Develop and validate
 
 Run the deterministic full-runtime suite:
 
 ```bash
-uv run --project idea-refinery-full --extra dev pytest -q
+uv run --project refine-idea --extra dev pytest -q
 ```
 
 Inspect deterministic CLI commands:
 
 ```bash
-uv run --project idea-refinery-full idea-refinery --help
+uv run --project refine-idea idea-refinery --help
 ```
 
 After canonical skill edits, synchronize the generated Copilot/Hermes distribution, then validate the implementation skill structure with Codex's Skill Creator validator:
@@ -219,17 +219,17 @@ After canonical skill edits, synchronize the generated Copilot/Hermes distributi
 python3 tools/sync_host_skills.py
 python3 tools/sync_host_skills.py --check
 python3 /absolute/path/to/skill-creator/scripts/quick_validate.py \
-  idea-refinery-implement
+  implement-refine-idea
 ```
 
-The GitHub workflow currently runs deterministic tests for changes under `idea-refinery-full/`, Spec 001, and the workflow file. Documentation-only and implementation-skill changes still need local validation.
+The GitHub workflow currently runs deterministic tests for changes under `refine-idea/`, Spec 001, and the workflow file. Documentation-only and implementation-skill changes still need local validation.
 
 ## Safety boundaries
 
 Neither skill commits, pushes, opens pull requests, merges, deploys, creates issues, or performs destructive cleanup unless the user separately requests a workflow with that authority.
 
-- `$idea-refinery-full` asks before Spec Kit initialization or artifact mutation where required.
-- `$idea-refinery-implement` continues through routine recovery (including objective review correction, scheduling repair, and replacement review) and blocks only on missing authority, material decisions, or external-state verification failures.
+- `$refine-idea` asks before Spec Kit initialization or artifact mutation where required.
+- `$implement-refine-idea` continues through routine recovery (including objective review correction, scheduling repair, and replacement review) and blocks only on missing authority, material decisions, or external-state verification failures.
 - Review workers are read-only; shared state remains controller-owned.
 - Existing unrelated user changes are preserved.
 
@@ -237,23 +237,23 @@ Neither skill commits, pushes, opens pull requests, merges, deploys, creates iss
 
 | Document | Reader goal |
 | --- | --- |
-| [Full refinement architecture](idea-refinery-full/ARCHITECTURE.md) | Understand stages, reviewer roles, state, repair, and readiness |
-| [Implementation architecture](idea-refinery-implement/ARCHITECTURE.md) | Understand scheduling, isolation, TDD, review, convergence, and completion |
+| [Full refinement architecture](refine-idea/ARCHITECTURE.md) | Understand stages, reviewer roles, state, repair, and readiness |
+| [Implementation architecture](implement-refine-idea/ARCHITECTURE.md) | Understand scheduling, isolation, TDD, review, convergence, and completion |
 | [Repository structure](RepoStructure.md) | Find source, generated artifacts, configuration, tests, and use cases |
 | [Setup and tryout](setup.md) | Install, update, remove, or test both skills |
-| [Full skill entrypoint](idea-refinery-full/SKILL.md) | Read the normative refinement instructions |
-| [Implementation skill entrypoint](idea-refinery-implement/SKILL.md) | Read the normative implementation instructions |
-| [Full orchestration contract](idea-refinery-full/references/orchestration-contract.md) | Audit refinement finding/readiness rules |
-| [Implementation orchestration contract](idea-refinery-implement/references/orchestration-contract.md) | Audit worker, evidence, review, and recovery rules |
+| [Full skill entrypoint](refine-idea/SKILL.md) | Read the normative refinement instructions |
+| [Implementation skill entrypoint](implement-refine-idea/SKILL.md) | Read the normative implementation instructions |
+| [Full orchestration contract](refine-idea/references/orchestration-contract.md) | Audit refinement finding/readiness rules |
+| [Implementation orchestration contract](implement-refine-idea/references/orchestration-contract.md) | Audit worker, evidence, review, and recovery rules |
 | [Spec 001](specs/001-refinery-quality-orchestration/spec.md) | See requirements for the full deterministic runtime |
 | [Spec 002](specs/002-parallel-tdd-implementation/spec.md) | See requirements for the implementation skill |
 
 ## Troubleshooting
 
 - **Copilot skill name is not recognized**: run `/skills reload`, use `/skills` to inspect the active skill source, and restart the session if the catalog remains stale. A project-local `.agents/skills` copy takes precedence over a personal copy.
-- **Copilot shows dollar-prefixed wording**: the description is shared with other hosts; invoke `/idea-refinery-full` or `/idea-refinery-implement` in Copilot CLI.
+- **Copilot shows dollar-prefixed wording**: the description is shared with other hosts; invoke `/refine-idea` or `/implement-refine-idea` in Copilot CLI.
 - **Codex skill name is not recognized**: verify both `readlink` commands, then start a new Codex session.
-- **Refinement cannot locate Spec Kit**: install `specify`; allow `$idea-refinery-full` to initialize the target only after reviewing its proposed changes.
+- **Refinement cannot locate Spec Kit**: install `specify`; allow `$refine-idea` to initialize the target only after reviewing its proposed changes.
 - **Implementation rejects the feature**: inspect `refinery-state.md` for the verdict, open decisions, unresolved high-severity findings, and missing traceability.
 - **Superpowers implementation components are absent**: the skill should record local fallback composition; it must not claim those components ran.
 - **`uv` cannot write its cache in a sandbox**: run validation in an environment where the project cache is writable or approve the narrowly scoped cache access.

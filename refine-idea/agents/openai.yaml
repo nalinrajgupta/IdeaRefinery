@@ -1,6 +1,6 @@
 interface:
-  display_name: "Idea Refinery Full"
+  display_name: "RefineIdea"
   short_description: "Orchestrate a full spec-refinement pipeline"
-  default_prompt: "Run the full Idea Refinery pipeline for this idea."
+  default_prompt: "Use $refine-idea to refine this idea into an implementation-ready plan."
 policy:
   allow_implicit_invocation: false

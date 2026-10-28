@@ -1,10 +1,10 @@
 # Idea Refinery Implement Architecture
 
-How `$idea-refinery-implement` turns a ready Idea Refinery handoff into reviewed, test-driven application changes without silently expanding its authority or pausing between authorized routine gates.
+How `$implement-refine-idea` turns a ready Idea Refinery handoff into reviewed, test-driven application changes without silently expanding its authority or pausing between authorized routine gates.
 
 ## Purpose and boundary
 
-This explicit-only skill consumes an active feature produced by `$idea-refinery-full`. It may edit application code, tests, `tasks.md`, and feature-local `implementation-state.md`. It may not change approved product scope or architecture, perform destructive cleanup, create worktrees without approval, or commit, push, open a pull request, merge, or deploy.
+This explicit-only skill consumes an active feature produced by `$refine-idea`. It may edit application code, tests, `tasks.md`, and feature-local `implementation-state.md`. It may not change approved product scope or architecture, perform destructive cleanup, create worktrees without approval, or commit, push, open a pull request, merge, or deploy.
 
 It does not implement arbitrary Spec Kit features. The active feature must contain `spec.md`, `plan.md`, `tasks.md`, and `refinery-state.md` with a recognized ready verdict.
 
@@ -194,5 +194,5 @@ Resume may reuse a verified wave only when artifact hashes, path hashes, command
 - [Normative implementation contract](references/orchestration-contract.md)
 - [Implementation state template](references/implementation-state-template.md)
 - [Repository structure](../RepoStructure.md)
-- [Refinement architecture](../idea-refinery-full/ARCHITECTURE.md)
+- [Refinement architecture](../refine-idea/ARCHITECTURE.md)
 - [Implementation feature plan](../specs/002-parallel-tdd-implementation/plan.md)

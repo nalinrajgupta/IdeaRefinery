@@ -21,13 +21,14 @@ from pathlib import Path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-SKILLS = ("idea-refinery-full", "idea-refinery-implement")
+SKILLS = ("refine-idea", "implement-refine-idea")
+LEGACY_SKILLS = ("idea-refinery-full", "idea-refinery-implement")
 GENERATED_MARKER = "<!-- Generated from {source}; do not edit this copy. -->\n"
 # Assets a copied installation needs to run the deterministic adapter without a
 # canonical repository checkout.
 RUNTIME_ASSETS = {
-    "idea-refinery-full": ("src", "defaults", "schemas", "pyproject.toml", "uv.lock"),
-    "idea-refinery-implement": (),
+    "refine-idea": ("src", "defaults", "schemas", "pyproject.toml", "uv.lock"),
+    "implement-refine-idea": (),
 }
 IGNORED_RUNTIME_FILES = shutil.ignore_patterns("__pycache__", "*.pyc")
 
@@ -116,6 +117,15 @@ def distributions_match(expected: Path, actual: Path) -> bool:
     )
 
 
+def remove_legacy_distributions(destination_root: Path) -> None:
+    """Remove distributions published under retired skill identifiers."""
+
+    for skill_name in LEGACY_SKILLS:
+        destination = destination_root / skill_name
+        if destination.exists():
+            shutil.rmtree(destination)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -135,6 +145,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
         if args.check:
+            for skill_name in LEGACY_SKILLS:
+                if (distribution_root / skill_name).exists():
+                    print(f"retired generated skill remains: {skill_name}", file=sys.stderr)
+                    return 1
             for skill_name in SKILLS:
                 if not distributions_match(
                     expected_root / skill_name, distribution_root / skill_name
@@ -143,6 +157,7 @@ def main(argv: list[str] | None = None) -> int:
                     return 1
             return 0
 
+        remove_legacy_distributions(distribution_root)
         for skill_name in SKILLS:
             destination = distribution_root / skill_name
             if destination.exists():

@@ -1,12 +1,12 @@
 ---
-name: idea-refinery-implement
-description: Execute an implementation-ready Spec Kit feature with dependency-safe parallel subagents, recorded test-driven development, independent review, bounded convergence, and fresh completion evidence. Use only when explicitly invoked as $idea-refinery-implement.
+name: implement-refine-idea
+description: Execute an implementation-ready Spec Kit feature with dependency-safe parallel subagents, recorded test-driven development, independent review, bounded convergence, and fresh completion evidence. Use only when explicitly invoked as $implement-refine-idea.
 ---
-<!-- Generated from idea-refinery-implement/SKILL.md; do not edit this copy. -->
+<!-- Generated from implement-refine-idea/SKILL.md; do not edit this copy. -->
 
-# Idea Refinery Implement
+# implementRefineIdea
 
-Implement the active feature produced by `$idea-refinery-full`. Preserve the refinement skill's handoff boundary: this skill may change application code, tests, `tasks.md`, and its own implementation state, but it does not change approved product scope or architecture.
+Implement the active feature produced by `$refine-idea`. Preserve the refinement skill's handoff boundary: this skill may change application code, tests, `tasks.md`, and its own implementation state, but it does not change approved product scope or architecture.
 
 Read [the orchestration contract](references/orchestration-contract.md) before dispatching any worker. Create or resume `implementation-state.md` from [the state template](references/implementation-state-template.md) in the active feature directory.
 
