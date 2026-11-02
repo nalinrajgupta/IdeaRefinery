@@ -59,7 +59,7 @@ jobs:
         if: steps.guard.outputs.run == 'true'
         id: changes
         run: |
-          git add -- README.md setup.md RepoStructure.md docs/host-compatibility.md refine-idea/ARCHITECTURE.md implement-refine-idea/ARCHITECTURE.md
+          git ls-files -z -- README.md setup.md RepoStructure.md docs/host-compatibility.md refine-idea/ARCHITECTURE.md implement-refine-idea/ARCHITECTURE.md | xargs -0 -r git add --
           git diff --cached --check
           if git diff --cached --quiet; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
