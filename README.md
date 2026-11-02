@@ -260,7 +260,7 @@ Neither skill commits, pushes, opens pull requests, merges, deploys, creates iss
 
 ## Automatic pull request documentation
 
-The `Update pull request documentation` GitHub Actions workflow uses Copilot CLI to update the existing user-facing docs when a non-draft pull request from a branch in this repository targets `main`. It commits changes to that branch, so review the bot's commit alongside the rest of the pull request. Fork pull requests are skipped. The workflow does not edit feature records under `specs/`.
+The `Update pull request documentation` GitHub Actions workflow uses Copilot CLI to update the existing user-facing docs when a non-draft pull request from a branch in this repository targets `main`. It commits to that branch only when documentation changes are staged, so review the bot's commit alongside the rest of the pull request. Fork pull requests are skipped, as are runs whose head commit matches the workflow's documentation-bot author and commit subject. The workflow does not edit feature records under `specs/`.
 
 To enable it, configure these repository settings:
 
