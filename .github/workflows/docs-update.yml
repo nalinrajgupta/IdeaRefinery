@@ -27,10 +27,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Skip documentation bot commits
+      - name: Check documentation automation prerequisites
         id: guard
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_DOCS_TOKEN }}
+          DOCS_BOT_APP_ID: ${{ vars.DOCS_BOT_APP_ID }}
+          DOCS_BOT_PRIVATE_KEY: ${{ secrets.DOCS_BOT_PRIVATE_KEY }}
         run: |
           if [ "$(git log -1 --format='%an <%ae>|%s')" = 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>|docs: update documentation for pull request' ]; then
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          elif [ -z "$COPILOT_GITHUB_TOKEN" ] || [ -z "$DOCS_BOT_APP_ID" ] || [ -z "$DOCS_BOT_PRIVATE_KEY" ]; then
+            echo '::warning::Skipping documentation updates: configure COPILOT_DOCS_TOKEN and DOCS_BOT_PRIVATE_KEY Actions secrets and the DOCS_BOT_APP_ID Actions variable. See README.md#automatic-pull-request-documentation.'
             echo 'run=false' >> "$GITHUB_OUTPUT"
           else
             echo 'run=true' >> "$GITHUB_OUTPUT"
