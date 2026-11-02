@@ -151,6 +151,9 @@ Each child directory is a Spec Kit feature package. The checked-in features docu
 | `001-refinery-quality-orchestration/` | Requirements, design, reviews, contracts, and tasks for the deterministic full-refinement runtime |
 | `002-parallel-tdd-implementation/` | Requirements, design, review ledger, and tasks for the implementation skill |
 | `004-implementor-continuity/` | Requirements, design, and tasks for preflight, completion-checklist, and terminal-drive controls |
+| [`006-f-auditor/`](specs/006-f-auditor/spec.md) | Planned manual auditor for Hermes and Codex session friction with the two skills, maintaining one shared functional-improvement backlog |
+
+Spec 006 contains design artifacts and implementation tasks only. Its planned `f-auditor/` package, generated skill, and shared backlog have not been created; the [quickstart](specs/006-f-auditor/quickstart.md) describes commands for use after implementation, not currently available functionality.
 
 A feature may contain:
 

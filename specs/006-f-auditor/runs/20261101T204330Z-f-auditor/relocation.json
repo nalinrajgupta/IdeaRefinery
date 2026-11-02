@@ -1,0 +1,14 @@
+{
+  "format": "historical-run-read-relocation",
+  "version": 1,
+  "source_run_root": "/Users/nalin-ai/GitRepo/IdeaRefinery-worktrees/func-audit/specs/006-f-auditor/runs/20261101T204330Z-f-auditor",
+  "destination_run_root": ".",
+  "scope": "Read-time lookup only; original serialized evidence and hashes remain authoritative.",
+  "unavailable_historical_locations": [
+    {
+      "path": "/Users/nalin-ai/.hermes/profiles/idea-iterator/cache/scratch/f-auditor-refinery-repair-20261101-cycle1/staged",
+      "kind": "repair-packet staging_path",
+      "reason": "Historical scratch directory, not bundled run evidence; no replacement or recovered contents are asserted."
+    }
+  ]
+}
