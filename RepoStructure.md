@@ -17,7 +17,7 @@ IdeaRefinery/
 ├── .agents/skills/speckit-*/       # repository-local Spec Kit skills
 ├── .agents/skills/refine-idea/     # generated refinement distribution
 ├── .agents/skills/implement-refine-idea/ # generated implementation distribution
-└── .github/workflows/              # deterministic runtime CI
+└── .github/workflows/              # deterministic runtime CI and PR documentation updates
 ```
 
 The two skill folders are intentionally separate. `refine-idea/` owns refinement and stops at an implementation-ready handoff. `implement-refine-idea/` consumes that handoff and has separate authority to edit application code and tests.
@@ -174,6 +174,8 @@ specs/<feature-id>/
 ## `.github/workflows/`
 
 `refinery-evals.yml` runs the deterministic Python tests for changes under `refine-idea/`, Spec 001, or the workflow itself. It currently does not trigger for changes limited to `implement-refine-idea/`, Spec 002, or top-level documentation. Validate those changes locally.
+
+`docs-update.yml` uses Copilot CLI to update existing user-facing documentation for non-draft, same-repository pull requests targeting `main`. When documentation changes are staged, it commits and pushes them to the pull request branch using a GitHub App token. Runs matching the workflow's documentation-bot commit are skipped to avoid a loop. See [automatic pull request documentation](README.md#automatic-pull-request-documentation) for required secrets, the app variable, and trust requirements.
 
 ## Source, generated artifacts, and runtime state
 

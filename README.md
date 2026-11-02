@@ -257,3 +257,15 @@ Neither skill commits, pushes, opens pull requests, merges, deploys, creates iss
 - **Implementation rejects the feature**: inspect `refinery-state.md` for the verdict, open decisions, unresolved high-severity findings, and missing traceability.
 - **Superpowers implementation components are absent**: the skill should record local fallback composition; it must not claim those components ran.
 - **`uv` cannot write its cache in a sandbox**: run validation in an environment where the project cache is writable or approve the narrowly scoped cache access.
+
+## Automatic pull request documentation
+
+The `Update pull request documentation` GitHub Actions workflow uses Copilot CLI to update the existing user-facing docs when a non-draft pull request from a branch in this repository targets `main`. It commits to that branch only when documentation changes are staged, so review the bot's commit alongside the rest of the pull request. Fork pull requests are skipped, as are runs whose head commit matches the workflow's documentation-bot author and commit subject. The workflow does not edit feature records under `specs/`.
+
+To enable it, configure these repository settings:
+
+1. Create a fine-grained personal access token for a user with Copilot access, granting the account-level **Copilot Requests** permission, and save it as the Actions secret `COPILOT_DOCS_TOKEN`. Copilot usage is billed to that user's entitlement.
+2. Install a GitHub App on this repository with **Contents: Read and write** permission. Save its app ID as the Actions variable `DOCS_BOT_APP_ID` and its private key as the Actions secret `DOCS_BOT_PRIVATE_KEY`. The app must be allowed to push to PR branches by any applicable branch rules. Its token causes the documentation commit to trigger normal PR checks.
+3. Enable Actions and Copilot CLI access under applicable account or organization policies. Pull requests can contain instructions in their content; only enable automatic writes for contributors trusted to modify branches in this repository.
+
+The workflow checks for whitespace errors before committing. A concurrent push causes the bot's non-force push to fail rather than overwrite newer commits; the new commit triggers another run. Copilot can make mistakes, so review its changes. See [Copilot CLI authentication](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli) and [GitHub App authentication in Actions](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/making-authenticated-api-requests-with-a-github-app-in-a-github-actions-workflow).
