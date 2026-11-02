@@ -94,6 +94,7 @@ audit -> config + fixed window -> read-only source inventory
         -> lock -> latest backlog -> merge -> atomic promotion -> report
 
 contributor complete -> same lock -> latest backlog -> status + fix evidence
+   -> refresh actionable index -> atomic promotion
 ```
 
 Source selection, runtime, output and contributor interfaces are fixed in [the audit interface contract](contracts/audit-interface.md); entity rules are in [data-model.md](data-model.md). These contracts, not guesses about undocumented fields, govern implementation.
@@ -108,11 +109,13 @@ Every supplied chunk needs analysis coverage and every finding needs valid origi
 
 ## Persistence, priorities and collaboration
 
-One configured Markdown file contains a helper-managed actionable priority index, stable `FI-` issue blocks with parseable metadata comments, and preserved human notes. Metadata is not a second status store. Require explicit `--backlog` or config destination; relative config paths resolve against the config file, never CWD. Keep issue IDs stable, deduplicate evidence by verified origin IDs, and validate analyzer grouping rationale. Uncertain root similarity cannot silently merge issues.
+One configured Markdown file contains a helper-managed actionable priority index, stable `FI-` issue blocks with parseable metadata comments, and preserved human notes. Metadata is not a second status store. Require explicit `--backlog` or config destination; relative config paths resolve against the config file, never CWD. Keep issue IDs stable, deduplicate evidence by canonical source/session identity and sorted occurrence-anchor origin IDs, and validate analyzer grouping rationale. Separate supporting citations from anchors; context changes must not alter occurrence identity or time. Only validated anchor timestamps establish recurrence timing, with mixed pre/post-fix anchors unresolved as specified in the interface contract. Uncertain root similarity cannot silently merge issues.
 
 Rubric: P1 blocks/invalidates successful or safe skill use; P2 repeated corrections/setup or workaround-dependent completion; P3 lower-impact functional ergonomics. Actionable order is P1→P2→P3, confirmed occurrence count descending, then stable ID. Preserve human priority overrides. Audit-created statuses are `Not Fixed`; only explicit contributor completion sets `Completed` with UTC fix time and fix evidence. Status-only legacy completion remains completed and yields an unresolved-classification diagnostic if recurrence timing cannot be established. A proved recurrence creates one separate open regression; later occurrences group there without reopening its completed predecessor.
 
 Lock the canonical destination's sibling lock file only for latest-file read/merge/promotion, not during analysis. All helper writers cooperate. Contributor updates during analysis are merged from the latest file under lock. Compare bytes before promotion, fsync a sibling temporary file and atomically replace. Persist a prior-version backup and mark the run committed only after confirming promotion. Replaying committed evidence cannot duplicate issues. Unknown/malformed backlog or observed direct drift causes conflict without overwrite; never discard a live OS lock because its filename exists. Direct manual edits are supported between runs per D-012; arbitrary concurrent editors bypassing coordination have no lost-update guarantee.
+
+Completion refreshes the actionable index together with the selected issue's completion fields in one locked atomic promotion. It immediately excludes the completed issue while preserving unrelated issue blocks and human notes byte-for-byte; no later audit is needed to reconcile status and index.
 
 ## Errors, tests and delivery
 
@@ -132,5 +135,7 @@ Lock the canonical destination's sibling lock file only for latest-file read/mer
 Tests precede behavior implementation. Schema/semantic contracts, deterministic tests, annotated approved replay fixtures and requirement-to-task traceability are blocking. Separate from deterministic cached replay, a real analyzer must process reviewed annotated positive and negative cases through the actual launcher, with recorded input/output provenance and no canned responses; unavailable live execution leaves behavioral acceptance unverified. Native manual smoke checks are also required completion evidence; a mock cannot establish live acceptance. Model-judge scores and trend benchmarks remain non-blocking unless separately calibrated.
 
 Ship canonical skill/helper, generated distribution, usage/contribution/setup docs and CI/distribution checks. The first manual run reports native source and closure coverage so the user can assess confidence. Rollback disables invocation and restores a known backup under coordination and explicit operator authority; never rewrite host histories. Scheduling, Windows auditing, automatic fixes, public publishing and remote histories remain deferred.
+
+T046 adds `f-auditor/**` to both push and pull-request filters in `.github/workflows/refinery-evals.yml` and a separate deterministic auditor job. Run `uv run --project f-auditor --extra dev pytest f-auditor/tests -m "not native_compatibility and not live_analysis"` without credentials or native history/runtime access, including during test collection. Register and apply those markers only to native probes and actual-launcher acceptance; deterministic replay and safety checks remain blocking. Native compatibility and live model acceptance run separately with real evidence and are not implied by green deterministic CI.
 
 Shared configuration/models/evidence contracts precede adapter and backlog lanes. Hermes and Codex adapter test/fixture work can run independently after contracts freeze; adapter implementations serialize because both write `sources.py`. Parser/coordination precedes completion and audit merge; analysis precedes behavioral replay; distribution/docs and native smoke follow integrated validation. Packaging, schema, lockfile and sync-script edits are exclusive write sets.

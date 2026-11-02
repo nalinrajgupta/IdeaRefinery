@@ -30,10 +30,11 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["conversation_id", "message_ids", "excerpts", "observed_behavior", "expected_behavior", "skill_relevance"],
+              "required": ["conversation_id", "occurrence_anchor_message_ids", "supporting_message_ids", "excerpts", "observed_behavior", "expected_behavior", "skill_relevance"],
               "properties": {
                 "conversation_id": {"type": "string", "minLength": 1},
-                "message_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+                "occurrence_anchor_message_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}, "description": "Origin messages directly recording one occurrence, not surrounding discussion. Identity and chronology derive only from these validated anchors."},
+                "supporting_message_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}, "description": "Context citations, disjoint from occurrence anchors. These do not affect occurrence identity or time."},
                 "excerpts": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
                 "observed_behavior": {"type": "string", "minLength": 1},
                 "expected_behavior": {"type": "string", "minLength": 1},

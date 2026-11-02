@@ -22,14 +22,14 @@ description: "Dependency-ordered implementation tasks for f-auditor"
 - [ ] T003 [P] Add configuration and time-boundary tests in `f-auditor/tests/unit/test_config.py` for root/backlog resolution, CWD independence, explicit destinations, UTC window boundaries, limits and invalid prerequisites (FR-002, FR-004, FR-007, FR-017, SC-010).
 - [ ] T004 [P] Add sanitization and injection tests in `f-auditor/tests/unit/test_evidence_safety.py` covering representative credentials, error paths, hostile transcript instructions and persistence/console/runtime boundaries (FR-013, SC-007).
 - [ ] T005 [P] Add immutable run and recovery tests in `f-auditor/tests/unit/test_run_store.py` for identity hashes, exact resume, incomplete analysis, pre/post-promotion interruption and idempotent committed evidence (FR-012, FR-014, FR-015).
-- [ ] T006 [P] Add schema and evidence contract tests in `f-auditor/tests/contract/test_analysis_result.py` for `f-auditor/schemas/analysis-result.schema.json`, origin IDs, exact sanitized excerpts, chunk attestations and invalid issue references (FR-006, FR-013, FR-020).
+- [ ] T006 [P] Add schema and evidence contract tests in `f-auditor/tests/contract/test_analysis_result.py` for `f-auditor/schemas/analysis-result.schema.json`, separate nonempty occurrence anchors and optional supporting citations, disjoint/in-conversation IDs, an occurrence-bearing anchor excerpt, rejection of legacy undifferentiated evidence, exact sanitized excerpts, chunk attestations and invalid issue references (FR-006, FR-013, FR-020).
 
 ### Implementation
 
 - [ ] T007 Implement configuration, absolute canonical paths, runtime limits, a single UTC 24-hour boundary and actionable validation in `f-auditor/src/f_auditor/config.py` (FR-002, FR-004, FR-007, FR-017).
 - [ ] T008 Implement normalized run/session/message/evidence structures, pre-output redaction, provenance and prompt-injection isolation in `f-auditor/src/f_auditor/evidence.py`; omit hidden reasoning and credentials without discarding relevant visible context (FR-006, FR-013, FR-019).
 - [ ] T009 Implement sanitized immutable bundles, version/hash identity, run dispositions and crash-aware commit/resume records in `f-auditor/src/f_auditor/run_store.py`; persist no raw transcripts (FR-012, FR-014, FR-015).
-- [ ] T010 Implement schema, exact-citation, issue-reference and complete-chunk validation in `f-auditor/src/f_auditor/analysis.py`; reject unsupported excerpts, incomplete coverage and fabricated timestamps (FR-006, FR-013, FR-020).
+- [ ] T010 Implement schema, exact-citation, occurrence-anchor, issue-reference and complete-chunk validation in `f-auditor/src/f_auditor/analysis.py`; enforce the disjoint anchor/supporting sets and anchor-excerpt rules in the interface contract, derive occurrence identity and time only from validated anchors, and reject unsupported excerpts, incomplete coverage and fabricated timestamps (FR-006, FR-013, FR-020).
 - [ ] T011 Run `uv run --project f-auditor --extra dev pytest f-auditor/tests/unit/test_config.py f-auditor/tests/unit/test_evidence_safety.py f-auditor/tests/unit/test_run_store.py f-auditor/tests/contract/test_analysis_result.py` and fix failures before story implementations (FR-013, FR-015, FR-020).
 
 ## Phase 3: User Story 1 — Audit relevant recent sessions (P1)
@@ -67,16 +67,16 @@ description: "Dependency-ordered implementation tasks for f-auditor"
 ### Tests first
 
 - [ ] T026 [P] [US2] Add Markdown round-trip, priority index, human-note/status preservation and malformed-format tests in `f-auditor/tests/unit/test_backlog_format.py` (FR-007, FR-009, FR-011, FR-014, SC-009).
-- [ ] T027 [P] [US2] Add grouping, exact-origin deduplication, ambiguous similarity, completed-fix chronology and linked regression tests in `f-auditor/tests/unit/test_regressions.py` (FR-008, FR-010, FR-015, SC-003, SC-004).
+- [ ] T027 [P] [US2] Add grouping, exact-origin deduplication, ambiguous similarity, completed-fix chronology and linked regression tests in `f-auditor/tests/unit/test_regressions.py`. Cover pre-fix failure anchors with post-fix discussion (no regression), post-fix failure anchors with pre-fix context (eligible regression), anchors spanning the fix boundary or lacking trustworthy timestamps (unresolved), anchors exactly at fix time (not subsequent), and reordered anchors or changed supporting citations on replay (unchanged identity/count/timing); distinct occurrences remain distinct (FR-008, FR-010, FR-015, SC-003, SC-004).
 - [ ] T028 [P] [US2] Add multiprocess helper-coordination, lock timeout, drift, latest-read merge, atomic promotion and interruption/recovery tests in `f-auditor/tests/integration/test_backlog_concurrency.py` (FR-009, FR-014, FR-021, SC-004).
-- [ ] T029 [P] [US2] Add completion-command validation and status-only legacy completion tests in `f-auditor/tests/contract/test_completion.py` for issue IDs, UTC fix time, evidence, owner and no mutation on error (FR-010, FR-018, FR-021).
+- [ ] T029 [P] [US2] Add completion-command validation and status-only legacy completion tests in `f-auditor/tests/contract/test_completion.py` for issue IDs, UTC fix time, evidence, owner and no mutation on error. Assert immediate removal from the actionable index without a subsequent audit, byte-preserved unrelated issue blocks and human notes, and atomic status/index consistency on failed promotion and concurrent helper updates (FR-010, FR-011, FR-018, FR-021).
 
 ### Implementation
 
 - [ ] T030 [US2] Implement single-authority Markdown parsing, stable `FI-` IDs, human-preserving edits, actionable priority index and conflict detection in `f-auditor/src/f_auditor/backlog.py` (FR-006, FR-007, FR-009, FR-011, FR-014).
-- [ ] T031 [US2] Implement same-root grouping, per-occurrence provenance, replay deduplication and post-fix linked regression/insufficient-evidence classification in `f-auditor/src/f_auditor/backlog.py` after T030 (FR-008, FR-010, FR-015).
+- [ ] T031 [US2] Implement same-root grouping, per-occurrence provenance, anchor-only identity/chronology, replay deduplication independent of supporting citations and post-fix linked regression/insufficient-evidence classification in `f-auditor/src/f_auditor/backlog.py` after T030; enforce mixed pre/post-fix anchor rules from the interface contract (FR-008, FR-010, FR-015).
 - [ ] T032 [US2] Implement the shared sibling OS lock, latest-file merge, observed-drift rejection, fsync/atomic replacement, backup and recoverable commit handling in `f-auditor/src/f_auditor/backlog.py` after T031; do not claim safety for uncoordinated concurrent editors (FR-009, FR-014, FR-021).
-- [ ] T033 [US2] Implement explicit contributor completion with issue ID, UTC time, fix evidence and owner in `f-auditor/src/f_auditor/cli.py`, using T032's lock and preserving all unrelated issues (FR-010, FR-018, FR-021).
+- [ ] T033 [US2] Implement explicit contributor completion with issue ID, UTC time, fix evidence and owner in `f-auditor/src/f_auditor/cli.py`, using T032's latest-read lock and atomic promotion for both completion fields and T030's refreshed actionable index; preserve all unrelated issue blocks and human notes byte-for-byte (FR-010, FR-011, FR-018, FR-021).
 - [ ] T034 [US2] Connect validated US1 findings to the backlog merge in `f-auditor/src/f_auditor/cli.py`, preserving statuses and classifying partial/failed outcomes without unsafe writes (FR-006, FR-007, FR-009, FR-010, FR-012, FR-014, FR-018).
 - [ ] T035 [US2] Run US2 unit, contract and multiprocess suites in `f-auditor/tests/`; verify replay, status preservation, uncertainty, lock failures and both pre/post-promotion recovery (SC-003, SC-004, SC-009).
 
@@ -101,7 +101,8 @@ description: "Dependency-ordered implementation tasks for f-auditor"
 
 - [ ] T041 Add failing distribution tests for the canonical skill, packaged schema/runtime assets and targeted generation that preserves bytes and metadata of unrelated generated copies in `tests/unit/test_host_skill_distribution.py` (FR-001, FR-016).
 - [ ] T042 Extend `tools/sync_host_skills.py` for `f-auditor/` and a targeted generation mode or equivalent scoped operation; regenerate only its intended host copies without rewriting unrelated generated copies. Preserve the existing full distribution check; keep packaging, lockfile and sync-script writes exclusive (FR-001, FR-016).
-- [ ] T043 Run the complete `f-auditor/tests/` suite, existing `refine-idea/tests/`, distribution tests and `python3 tools/sync_host_skills.py --check`; retain real results in the implementation validation record (FR-001–FR-021, SC-001–SC-010).
+- [ ] T046 Add `f-auditor/**` to both push and pull-request path triggers in `.github/workflows/refinery-evals.yml` and add a separate credential-free deterministic auditor job using the existing checkout/setup-uv pattern and `uv run --project f-auditor --extra dev pytest f-auditor/tests -m "not native_compatibility and not live_analysis"`. Register those markers in `f-auditor/pyproject.toml`, mark native probes and actual-launcher acceptance tests from T015/T025/T044, and ensure collection does not access native histories, credentials or model runtimes. Keep deterministic replay/safety tests unmarked and blocking; leave native compatibility and live analysis as separate explicit acceptance gates, never silently passed by CI (FR-013, FR-020, SC-007, SC-008).
+- [ ] T043 Run the complete credential-free `f-auditor/tests/` suite with T046's marker exclusions, existing `refine-idea/tests/`, distribution tests and `python3 tools/sync_host_skills.py --check`; verify auditor-only changes select T046's workflow/job and that the deterministic auditor job passes without native hosts or credentials. Retain real results in the implementation validation record; native/live acceptance remains separately required in T025/T044–T045 (FR-001–FR-021, SC-001–SC-010).
 - [ ] T044 Exercise `specs/006-f-auditor/quickstart.md` with the actual implemented command, supported native runtime and actual native history sources; also execute the real analyzer on approved annotated positive/negative fixtures with input/output provenance. Record redacted outcomes, source/closure gaps and before/after history hashes; unavailable live execution leaves acceptance unverified, never fabricated (FR-001, FR-003, FR-005, FR-012, FR-020, SC-006, SC-008).
 - [ ] T045 Verify every FR/SC against passing tests and native evidence, document limitations and restore/rollback procedure, and explicitly block full acceptance if either required host lacks a verified usable closure path or native runtime safety boundary in `f-auditor/references/validation-record.md` (FR-003, FR-013, FR-019, SC-001, SC-005, SC-007).
 
@@ -111,7 +112,7 @@ description: "Dependency-ordered implementation tasks for f-auditor"
 - US1 test/fixture tasks T012–T016 are disjoint and may run in parallel after the foundation. T017 and T018 must serialize because they both modify `sources.py`; T021 and T022 serialize on `analysis.py`. T023 depends on selection and analysis; T024 depends on implementation; T025 requires actual native compatibility evidence.
 - US2 tests T026–T029 are disjoint and may run in parallel. T030–T032 serialize on `backlog.py`; T033 needs coordination, and T034 integrates US1 and US2 through `cli.py`. Independent US2 fixture testing does not require native histories.
 - US3 tests T036–T037 may run in parallel. T038 follows T034 and serializes with other `cli.py` work; T039 serializes with T020 because both touch skill files. T040 follows T038–T039.
-- T041–T045 follow integrated behavior; T042 owns sync edits exclusively. T043–T045 are final gates, not substitutes for red/green tests. No concurrent work may share a file or bypass dependency completion merely because a task is marked `[P]`.
+- T041–T042 and T046 follow integrated behavior; T042 owns sync edits exclusively. T046 owns workflow/marker edits exclusively, depends on the T001 package and T015/T025 test definitions, and precedes T043. T044 uses T046's live markers; T043–T045 are final gates, not substitutes for red/green tests. T046 is numbered out of sequence to preserve existing task IDs. No concurrent work may share a file or bypass dependency completion merely because a task is marked `[P]`.
 
 ## Traceability
 
@@ -127,16 +128,16 @@ description: "Dependency-ordered implementation tasks for f-auditor"
 | FR-008 | T027, T031 |
 | FR-009 | T026, T028, T030, T032, T034 |
 | FR-010 | T027, T029, T031, T033–T034 |
-| FR-011 | T020, T026, T030 |
+| FR-011 | T020, T026, T029–T030, T033 |
 | FR-012 | T005, T009, T016, T021, T023, T034, T036–T038 |
-| FR-013 | T004, T006, T008, T010, T016, T020–T022, T039, T045 |
+| FR-013 | T004, T006, T008, T010, T016, T020–T022, T039, T045–T046 |
 | FR-014 | T005, T009, T026, T028, T030, T032, T034, T037 |
 | FR-015 | T005, T009, T027, T031 |
 | FR-016 | T001, T020–T022, T041–T042 |
 | FR-017 | T001, T003, T007, T036, T038–T039 |
 | FR-018 | T029, T033–T034, T036, T038 |
 | FR-019 | T008, T012–T014, T017–T019, T023, T025, T045 |
-| FR-020 | T002, T006, T010, T015–T016, T024 |
+| FR-020 | T002, T006, T010, T015–T016, T024, T046 |
 | FR-021 | T028–T029, T032–T033, T039 |
 
 Success criteria SC-001–SC-010 map to the explicitly tagged tests and final gates above. Setup, tooling, recovery and documentation tasks also trace to operational and safety needs in the plan.

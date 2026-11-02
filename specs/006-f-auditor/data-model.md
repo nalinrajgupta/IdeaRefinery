@@ -40,9 +40,9 @@ Message fields: origin ID, role (`user`, `assistant`, `tool`), UTC timestamp wit
 
 ## Evidence occurrence
 
-Fields: stable `evidence_id`, host/source/profile/session identity, origin message IDs, occurrence timestamp/provenance, sanitized excerpts, observed behavior, expected behavior, affected skill and skill-relevance explanation.
+Fields: stable `evidence_id`, host/source/profile/session identity, nonempty `occurrence_anchor_message_ids`, separate `supporting_message_ids`, occurrence start/end timestamps with provenance, sanitized excerpts, observed behavior, expected behavior, affected skill and skill-relevance explanation. Each entry describes one event; anchors directly record it, while supporting citations provide context and may be empty.
 
-The deterministic validator verifies IDs and excerpts against the immutable bundle. It rejects unsupported quotes, timestamp fabrication, outside-bundle citations and transcript instructions masquerading as authorization. Actual repeated occurrences are distinct; rereading/importing the same origin occurrence is not a new event.
+The deterministic validator verifies both disjoint ID sets and excerpts against the named conversation in the immutable bundle, including at least one occurrence-bearing anchor excerpt. It rejects unsupported quotes, timestamp fabrication, outside-bundle citations and transcript instructions masquerading as authorization. Hash canonical host/source/profile/origin-session identity plus sorted unique anchor origin IDs for `evidence_id`; only anchor timestamp minima/maxima determine occurrence start/end. Supporting citations and their timestamps, excerpt wording, chunk boundaries and model-local IDs never affect identity or chronology. Actual repeated occurrences have separate entries; rereading/importing the same origin occurrence, reordering anchors or changing supporting citations is not a new event. Finding evidence without explicit anchors is rejected rather than migrated by guessing.
 
 ## Improvement issue
 
@@ -63,10 +63,12 @@ The Markdown block's visible `Status:` and `Priority:` fields are authoritative.
 
 Validated same-root findings merge into an existing actionable issue; unsupported similarity is reported for review, not silently consolidated. Priority index orders actionable issues P1/P2/P3, then confirmed occurrence count descending, then stable ID. Completed issues remain retained but outside that index.
 
-If a completed root recurs, require a new occurrence after the contributor's fix time plus evidence explaining what fixed behavior failed again. Old contextual messages alone cannot trigger regression. Missing/ambiguous fix evidence preserves completion and produces an unresolved-classification diagnostic. A proven recurrence creates a separate Not Fixed regression linked to the predecessor; additional occurrences merge into the open regression. Re-auditing the same post-fix evidence does not create another regression.
+If a completed root recurs, require every validated occurrence anchor to be strictly after the contributor's fix time plus evidence explaining what fixed behavior failed again. Pre-fix failure anchors with post-fix discussion remain pre-fix evidence; post-fix failure anchors with pre-fix supporting context may establish regression. Old contextual messages alone cannot trigger regression. Anchors spanning the fix boundary, untrustworthy anchor timestamps or missing/ambiguous fix evidence preserve completion and produce an unresolved-classification diagnostic. A proven recurrence creates a separate Not Fixed regression linked to the predecessor; additional occurrences merge into the open regression. Re-auditing the same post-fix anchors with different supporting citations does not create another occurrence or regression.
 
 ## Shared-file mutation
 
 Audit merge and contributor completion share the canonical sibling lock. Read the latest Markdown inside that lock, preserve human-owned content, check unexpected byte drift, write/fsync a sibling temporary file and atomically promote. Preserve a prior-version backup and exact commit evidence. The lock is held during mutation, not model analysis; contributor changes during analysis are incorporated from the latest file.
+
+Contributor completion patches the selected issue's completion fields and refreshes the managed actionable index in that same locked atomic promotion. A completed issue is absent from the index immediately, without waiting for an audit; unrelated issue blocks and all human notes retain their bytes. Failure before promotion preserves both old status and old index.
 
 Direct edits are supported between runs per D-012. Uncoordinated concurrent editors are not a supported safe-write mode; observed drift aborts rather than overwrites. Failure or no findings preserves the existing issue blocks. Malformed or unknown Markdown structure is a conflict, never a reason to rebuild or reset the file.
