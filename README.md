@@ -264,8 +264,6 @@ The `Update pull request documentation` GitHub Actions workflow uses Copilot CLI
 
 To enable it, configure these repository settings:
 
-Until all three settings below are nonempty, the workflow emits a warning and skips documentation generation and pushes. Invalid or expired credentials still cause a failure once configured.
-
 1. Create a fine-grained personal access token for a user with Copilot access, granting the account-level **Copilot Requests** permission, and save it as the Actions secret `COPILOT_DOCS_TOKEN`. Copilot usage is billed to that user's entitlement.
 2. Install a GitHub App on this repository with **Contents: Read and write** permission. Save its app ID as the Actions variable `DOCS_BOT_APP_ID` and its private key as the Actions secret `DOCS_BOT_PRIVATE_KEY`. The app must be allowed to push to PR branches by any applicable branch rules. Its token causes the documentation commit to trigger normal PR checks.
 3. Enable Actions and Copilot CLI access under applicable account or organization policies. Pull requests can contain instructions in their content; only enable automatic writes for contributors trusted to modify branches in this repository.
